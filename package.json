@@ -1,0 +1,42 @@
+{
+  "name": "pwa-aibox",
+  "version": "1.0.0",
+  "description": "PWA AI Box Photobooth - AI-Powered Photobox with MediaPipe Hand Gesture",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^1.0.1",
+    "@serwist/next": "^9.0.11",
+    "firebase": "^11.3.1",
+    "firebase-admin": "^13.1.0",
+    "framer-motion": "^11.18.2",
+    "konva": "^9.3.18",
+    "lucide-react": "^0.475.0",
+    "next": "^16.3.3",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-konva": "^18.2.10",
+    "resend": "^4.1.2",
+    "serwist": "^9.0.11"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@tailwindcss/postcss": "^4.0.17",
+    "@types/node": "^22.13.14",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.1",
+    "autoprefixer": "^10.5.4",
+    "eslint": "^9.24.0",
+    "eslint-config-next": "^16.0.0",
+    "postcss": "^8.5.3",
+    "prettier": "^3.5.3",
+    "tailwindcss": "^4.1.4",
+    "typescript": "^5.8.3"
+  }
+}

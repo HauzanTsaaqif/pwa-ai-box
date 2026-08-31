@@ -1,0 +1,29 @@
+{
+  "name": "AI Box Photobooth",
+  "short_name": "AI Box",
+  "description": "AI-Powered Photobooth PWA — Gesture-controlled photo experience with instant digital delivery",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0F172A",
+  "theme_color": "#0F172A",
+  "scope": "/",
+  "categories": ["photography", "entertainment", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "related_applications": [],
+  "prefer_related_applications": false
+}

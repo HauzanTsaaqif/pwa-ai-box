@@ -1,0 +1,44 @@
+rules_version = '2';
+
+// =====================================================
+// FIRESTORE SECURITY RULES — PWA AI BOX PHOTOBOOTH
+// Project: esp32-smartdoor
+// =====================================================
+
+// Admin collection — only authenticated admin can read/write
+// Admin authentication is handled server-side via Firebase Admin SDK
+match /admin/{username} {
+  // Deny all client-side access to admin credentials
+  // Authentication is done server-side via API routes
+  allow read, write: if false;
+}
+
+// Packages collection — readable by anyone, writable only by admin
+match /packages/{packageId} {
+  allow read: if true;
+  allow write: if request.auth != null && request.auth.token.role == 'admin';
+}
+
+// Transactions collection — readable/writable by admin only
+match /transactions/{transactionId} {
+  allow read: if request.auth != null && request.auth.token.role == 'admin';
+  allow write: if request.auth != null && request.auth.token.role == 'admin';
+  allow create: if request.auth != null;
+}
+
+// Sessions collection — readable/writable by admin only
+match /sessions/{sessionId} {
+  allow read, write: if request.auth != null && request.auth.token.role == 'admin';
+}
+
+// Photos collection — readable by anyone with a valid link, writable by admin
+match /photos/{photoId} {
+  allow read: if true;
+  allow write: if request.auth != null && request.auth.token.role == 'admin';
+  allow delete: if request.auth != null && request.auth.token.role == 'admin';
+}
+
+// Default deny
+match /{document=**} {
+  allow read, write: if false;
+}
