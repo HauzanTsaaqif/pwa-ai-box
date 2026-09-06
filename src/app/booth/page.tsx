@@ -158,9 +158,10 @@ export default function BoothPage() {
   // Timers & Inputs State
   const [qrisTimer, setQrisTimer] = useState(5);
   const [photoCountdown, setPhotoCountdown] = useState(3);
-  const [qrTimer, setQrTimer] = useState(5);
+  const [qrTimer, setQrTimer] = useState(15);
   const [emailInput, setEmailInput] = useState("");
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const isRecordingVoiceRef = useRef(false);
 
   // Upload & Drive State
   const [isUploading, setIsUploading] = useState(false);
@@ -191,9 +192,9 @@ export default function BoothPage() {
     return canvas.toDataURL("image/jpeg", 0.92);
   }, []);
 
-  // ===== SPEECH RECOGNITION (VOICE-TO-TEXT) =====
+  // ===== SPEECH RECOGNITION (VOICE-TO-TEXT WITH FIST GESTURE ✊) =====
   const startRecordingVoice = useCallback(() => {
-    if (typeof window === "undefined" || isRecordingVoice) return;
+    if (typeof window === "undefined" || isRecordingVoiceRef.current) return;
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
@@ -209,26 +210,35 @@ export default function BoothPage() {
       recognition.interimResults = false;
 
       recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        const formatted = transcript.toLowerCase().replace(/\s+/g, "");
+        const rawTranscript = event.results[0][0].transcript.toLowerCase();
+        let formatted = rawTranscript
+          .replace(/\s+at\s+/g, "@")
+          .replace(/\s+et\s+/g, "@")
+          .replace(/\s+dot\s+/g, ".")
+          .replace(/\s+titik\s+/g, ".")
+          .replace(/\s+/g, "");
+
         setEmailInput((prev) => (prev ? `${prev}${formatted}` : formatted));
       };
 
       recognition.onend = () => {
         setIsRecordingVoice(false);
+        isRecordingVoiceRef.current = false;
       };
 
       speechRecognitionRef.current = recognition;
       recognition.start();
       setIsRecordingVoice(true);
+      isRecordingVoiceRef.current = true;
     } catch (err) {
       console.warn("Failed to start speech recognition:", err);
       setIsRecordingVoice(false);
+      isRecordingVoiceRef.current = false;
     }
-  }, [isRecordingVoice]);
+  }, []);
 
   const stopRecordingVoice = useCallback(() => {
-    if (speechRecognitionRef.current) {
+    if (speechRecognitionRef.current && isRecordingVoiceRef.current) {
       try {
         speechRecognitionRef.current.stop();
       } catch (err) {
@@ -236,6 +246,7 @@ export default function BoothPage() {
       }
     }
     setIsRecordingVoice(false);
+    isRecordingVoiceRef.current = false;
   }, []);
 
   // ===== HANDLE UPLOAD TO GOOGLE DRIVE & EMAIL SERVICE =====
@@ -262,24 +273,34 @@ export default function BoothPage() {
       });
 
       const driveData = await driveRes.json();
-      if (driveData.success) {
-        setDriveFolderUrl(driveData.folderUrl);
-        setDriveFolderName(driveData.folderName);
+      const folderUrl = driveData.folderUrl || "https://drive.google.com/drive/folders/1IrNwnqXQjo4fG2InPIAWZMgE7n8dmj0K";
+      const folderName = driveData.folderName || "AIBox_Photos";
 
-        if (targetEmailToUse && targetEmailToUse.includes("@")) {
-          await fetch("/api/email/send", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              toEmail: targetEmailToUse,
-              userName: "LAPLACE_ZERO",
-              publicPhotoUrl: driveData.publicPhotoUrl || driveData.folderUrl,
-              folderUrl: driveData.folderUrl,
-              folderName: driveData.folderName,
-              imageBase64: photoDataUrl,
-            }),
-          });
+      if (driveData.success) {
+        setDriveFolderUrl(folderUrl);
+        setDriveFolderName(folderName);
+      }
+
+      // Pastikan Email Selalu Terkirim Jika Ada Input Email
+      const emailToSend = targetEmailToUse.trim();
+      if (emailToSend && (emailToSend.includes("@") || emailToSend.length > 3)) {
+        let finalEmailTarget = emailToSend;
+        if (!finalEmailTarget.includes("@")) {
+          finalEmailTarget += "@gmail.com";
         }
+
+        await fetch("/api/email/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            toEmail: finalEmailTarget,
+            userName: "LAPLACE_ZERO",
+            publicPhotoUrl: driveData.publicPhotoUrl || folderUrl,
+            folderUrl: folderUrl,
+            folderName: folderName,
+            imageBase64: photoDataUrl,
+          }),
+        });
       }
     } catch (err) {
       console.error("Failed to upload drive and send email:", err);
@@ -592,10 +613,10 @@ export default function BoothPage() {
     }
   }, [step, captureSnapshot, selectedPkg]);
 
-  // ===== FINAL QR CODE DOWNLOAD AUTO-RESET TIMER (5 SECONDS) =====
+  // ===== FINAL QR CODE DOWNLOAD AUTO-RESET TIMER (15 SECONDS) =====
   useEffect(() => {
     if (step === "qr_download") {
-      setQrTimer(5);
+      setQrTimer(15);
       const interval = setInterval(() => {
         setQrTimer((prev) => {
           if (prev <= 1) {
