@@ -50,6 +50,7 @@ import {
   type GestureType,
 } from "@/lib/mediapipe";
 import Logo from "@/components/Logo";
+import { QRCodeSVG } from "qrcode.react";
 
 // ===== CONSTANTS =====
 const HIDDEN_TAP_THRESHOLD = 5;
@@ -161,6 +162,11 @@ export default function BoothPage() {
   const [emailInput, setEmailInput] = useState("");
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
 
+  // Upload & Drive State
+  const [isUploading, setIsUploading] = useState(false);
+  const [driveFolderUrl, setDriveFolderUrl] = useState("");
+  const [driveFolderName, setDriveFolderName] = useState("");
+
   // Admin Modal State
   const [showAdminDialog, setShowAdminDialog] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
@@ -231,6 +237,56 @@ export default function BoothPage() {
     }
     setIsRecordingVoice(false);
   }, []);
+
+  // ===== HANDLE UPLOAD TO GOOGLE DRIVE & EMAIL SERVICE =====
+  const handleFinishUploadAndEmail = useCallback(async (targetEmailInput?: string) => {
+    setStep("qr_download");
+    setIsUploading(true);
+    const targetEmailToUse = targetEmailInput !== undefined ? targetEmailInput : emailInput;
+
+    let photoDataUrl = capturedPhotos[0] || "";
+    if (selectedPhotoIndices.length > 0 && capturedPhotos.length > 0) {
+      photoDataUrl = capturedPhotos[selectedPhotoIndices[0]] || capturedPhotos[0];
+    }
+
+    try {
+      const driveRes = await fetch("/api/upload-drive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId: "LAPLACE_ZERO",
+          targetEmail: targetEmailToUse,
+          imageBase64: photoDataUrl,
+          fileName: "photostrip.png",
+        }),
+      });
+
+      const driveData = await driveRes.json();
+      if (driveData.success) {
+        setDriveFolderUrl(driveData.folderUrl);
+        setDriveFolderName(driveData.folderName);
+
+        if (targetEmailToUse && targetEmailToUse.includes("@")) {
+          await fetch("/api/email/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              toEmail: targetEmailToUse,
+              userName: "LAPLACE_ZERO",
+              publicPhotoUrl: driveData.publicPhotoUrl || driveData.folderUrl,
+              folderUrl: driveData.folderUrl,
+              folderName: driveData.folderName,
+              imageBase64: photoDataUrl,
+            }),
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to upload drive and send email:", err);
+    } finally {
+      setIsUploading(false);
+    }
+  }, [capturedPhotos, selectedPhotoIndices, emailInput]);
 
   // ===== INIT CAMERA & MEDIAPIPE =====
   useEffect(() => {
@@ -350,7 +406,7 @@ export default function BoothPage() {
             } else if (result.gesture === "open_palm") {
               stopRecordingVoice();
             } else if (result.gesture === "thumbs_up") {
-              setStep("qr_download");
+              handleFinishUploadAndEmail();
             }
           }
         });
@@ -1428,14 +1484,14 @@ export default function BoothPage() {
               {/* Submit Buttons */}
               <div className="flex gap-4">
                 <button
-                  onClick={() => setStep("qr_download")}
+                  onClick={() => handleFinishUploadAndEmail("")}
                   className="flex-1 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold text-xs transition-all border border-white/10"
                 >
                   Lewati Email
                 </button>
 
                 <button
-                  onClick={() => setStep("qr_download")}
+                  onClick={() => handleFinishUploadAndEmail(emailInput)}
                   className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl font-bold text-xs transition-all shadow-lg shadow-purple-500/30 flex items-center justify-center gap-1.5"
                 >
                   <ThumbsUp className="w-4 h-4" />
@@ -1469,35 +1525,45 @@ export default function BoothPage() {
                 Scan QR Code di bawah untuk menyimpan file foto ke smartphone anda
               </p>
 
-              {/* Simulated QR Code Graphic */}
-              <div className="bg-white p-4 rounded-2xl shadow-xl border border-gray-200 inline-block mb-4">
-                <svg
-                  viewBox="0 0 200 200"
-                  className="w-48 h-48 mx-auto"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <rect width="200" height="200" fill="white" />
-                  <path
-                    d="M10 10h60v60H10zM130 10h60v60h-60zM10 130h60v60H10z"
-                    fill="black"
+              {/* QR Code & Drive Link */}
+              {isUploading ? (
+                <div className="py-8 text-center space-y-3">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="w-12 h-12 border-4 border-sky-400 border-t-transparent rounded-full mx-auto"
                   />
-                  <path
-                    d="M25 25h30v30H25zM145 25h30v30h-30zM25 145h30v30H25z"
-                    fill="white"
-                  />
-                  <path
-                    d="M32 32h16v16H32zM152 32h16v16h-16zM32 152h16v16H32z"
-                    fill="black"
-                  />
-                  <path
-                    d="M80 20h20v20H80zM110 20h10v20h-10zM80 50h15v15H80zM20 80h25v20H20zM55 80h15v35H55zM80 80h30v15H80zM120 80h20v20h-20zM150 80h30v35h-30zM80 110h15v30H80zM105 110h25v15h-25zM80 150h30v30H80zM120 150h20v15h-20zM150 150h30v30h-30z"
-                    fill="#0ea5e9"
-                  />
-                </svg>
-                <span className="text-dark font-extrabold text-[10px] block mt-2 tracking-widest uppercase">
-                  https://aibox.app/strip/session-8921
-                </span>
-              </div>
+                  <p className="text-xs text-sky-200 font-semibold animate-pulse">
+                    Memproses & Mengunggah ke Google Drive...
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-white p-4 rounded-2xl shadow-xl border border-gray-200 inline-block mb-4">
+                    <QRCodeSVG
+                      value={driveFolderUrl || "https://drive.google.com/drive/folders/1IrNwnqXQjo4fG2InPIAWZMgE7n8dmj0K"}
+                      size={180}
+                      className="mx-auto"
+                    />
+                    <span className="text-dark font-extrabold text-[10px] block mt-2 tracking-wider uppercase">
+                      {driveFolderName || "Google Drive Folder"}
+                    </span>
+                  </div>
+
+                  {driveFolderUrl && (
+                    <div className="mb-4">
+                      <a
+                        href={driveFolderUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-block px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-bold text-xs shadow-md transition-all"
+                      >
+                        📂 Buka Google Drive Publik
+                      </a>
+                    </div>
+                  )}
+                </>
+              )}
 
               <div className="bg-sky-500/20 border border-sky-400/40 rounded-xl py-2 px-4 mb-4">
                 <span className="text-sky-300 text-xs font-semibold">

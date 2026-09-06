@@ -24,9 +24,20 @@ yarn-error.log*
 
 # local env & secret key files
 .env*.local
-*_key.json
+*.json
+!package.json
+!tsconfig.json
+!package-lock.json
 *.key
 
+# test scripts & scratch tools
+test_*.js
+check_*.js
+list_*.js
+generate_*.py
+
+# uploads
+public/uploads/
 
 # vercel
 .vercel
