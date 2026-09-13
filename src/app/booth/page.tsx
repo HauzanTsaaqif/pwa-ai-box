@@ -161,6 +161,7 @@ export default function BoothPage() {
   const stepRef = useRef<BoothStep>("idle");
   const stepEntryTimeRef = useRef<number>(Date.now());
   const lastProcessedGestureRef = useRef<GestureType>("none");
+  const emailPendingTargetRef = useRef<string | null>(null);
   const setStep = useCallback((newStep: BoothStep) => {
     stepRef.current = newStep;
     stepEntryTimeRef.current = Date.now();
@@ -383,39 +384,37 @@ export default function BoothPage() {
   }, [capturedPhotos, selectedPhotoIndices, driveFolderUrl, isUploading]);
 
   // ===== HANDLE SEND EMAIL & FINISH TO QR DOWNLOAD =====
-  const handleSendEmailAndFinish = useCallback(async (targetEmailInput?: string) => {
+  const handleSendEmailAndFinish = useCallback((targetEmailInput?: string) => {
     setStep("qr_download");
     const targetEmailToUse = targetEmailInput !== undefined ? targetEmailInput : emailInput;
+    emailPendingTargetRef.current = targetEmailToUse.trim();
+  }, [emailInput, setStep]);
 
-    let photoDataUrl = capturedPhotos[0] || "";
-    if (selectedPhotoIndices.length > 0 && capturedPhotos.length > 0) {
-      photoDataUrl = capturedPhotos[selectedPhotoIndices[0]] || capturedPhotos[0];
-    }
+  // ===== EFFECT: SEND EMAIL WHEN UPLOAD FINISHES =====
+  useEffect(() => {
+    if (step === "qr_download" && !isUploading && driveFolderUrl && emailPendingTargetRef.current) {
+      const emailToSend = emailPendingTargetRef.current;
+      emailPendingTargetRef.current = null; // consume it so we only send once
 
-    const emailToSend = targetEmailToUse.trim();
-    if (emailToSend && (emailToSend.includes("@") || emailToSend.length > 3)) {
-      let finalEmailTarget = emailToSend;
-      if (!finalEmailTarget.includes("@")) {
-        finalEmailTarget += "@gmail.com";
-      }
-
-      try {
-        await fetch("/api/email/send", {
+      if (emailToSend && (emailToSend.includes("@") || emailToSend.length > 3)) {
+        let finalEmailTarget = emailToSend;
+        if (!finalEmailTarget.includes("@")) {
+          finalEmailTarget += "@gmail.com";
+        }
+        fetch("/api/email/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             toEmail: finalEmailTarget,
             userName: "LAPLACE_ZERO",
-            publicPhotoUrl: driveFolderUrl || "https://ai-box.id",
-            folderUrl: driveFolderUrl || "https://ai-box.id",
+            publicPhotoUrl: driveFolderUrl,
+            folderUrl: driveFolderUrl,
             folderName: driveFolderName || "AIBox_Photos",
           }),
-        });
-      } catch (err) {
-        console.error("Failed to send email:", err);
+        }).catch((err) => console.error("Failed to send email:", err));
       }
     }
-  }, [capturedPhotos, selectedPhotoIndices, emailInput, driveFolderUrl, driveFolderName]);
+  }, [step, isUploading, driveFolderUrl, driveFolderName]);
 
   // ===== INIT CAMERA & MEDIAPIPE =====
   useEffect(() => {
