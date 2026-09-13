@@ -60,12 +60,18 @@ export async function POST(req: Request) {
 
     const drive = getDriveInstance();
 
-    // 1. Pastikan Parent Folder Publik
+    // 1. Pastikan Parent Folder Publik & Berikan Akses Writer ke Apps Script Owner (project.aibox@gmail.com)
     try {
       await drive.permissions.create({
         fileId: parentFolderId,
         requestBody: { role: "reader", type: "anyone" },
         supportsAllDrives: true,
+      });
+      await drive.permissions.create({
+        fileId: parentFolderId,
+        requestBody: { role: "writer", type: "user", emailAddress: "project.aibox@gmail.com" },
+        supportsAllDrives: true,
+        sendNotificationEmail: false,
       });
       if (targetEmail) {
         await drive.permissions.create({
@@ -97,12 +103,22 @@ export async function POST(req: Request) {
 
     const folderUrl = folderRes.data.webViewLink || `https://drive.google.com/drive/folders/${folderId}`;
 
-    // 3. Set Hak Akses Subfolder SPESIFIK ke PUBLIC (Anyone with link)
+    // 3. Set Hak Akses Subfolder SPESIFIK ke PUBLIC (Anyone with link) & Editor ke project.aibox@gmail.com
     await drive.permissions.create({
       fileId: folderId,
       requestBody: { role: "reader", type: "anyone" },
       supportsAllDrives: true,
     });
+    try {
+      await drive.permissions.create({
+        fileId: folderId,
+        requestBody: { role: "writer", type: "user", emailAddress: "project.aibox@gmail.com" },
+        supportsAllDrives: true,
+        sendNotificationEmail: false,
+      });
+    } catch (gappsPermErr) {
+      console.warn("Apps script user permission warning:", gappsPermErr);
+    }
 
     // 4. Berikan akses pembaca eksplisit ke email target
     if (targetEmail) {
@@ -152,7 +168,7 @@ export async function POST(req: Request) {
         console.warn("Local storage save warning:", localErr);
       }
 
-      // b. Opsi Google Apps Script Bridge (jika GOOGLE_APPS_SCRIPT_URL diset di .env.local)
+      // b. Opsi Google Apps Script Bridge (Jika GOOGLE_APPS_SCRIPT_URL diset di .env.local)
       if (process.env.GOOGLE_APPS_SCRIPT_URL) {
         try {
           const gappsRes = await fetch(process.env.GOOGLE_APPS_SCRIPT_URL, {
@@ -162,60 +178,49 @@ export async function POST(req: Request) {
               folderId: folderId,
               fileName: targetFileName,
               imageBase64: photoBuffer.toString("base64"),
-              mimeType: "image/png",
+              mimeType: targetFileName.endsWith(".avif") ? "image/avif" : "image/png",
             }),
           });
           const gappsData = await gappsRes.json();
-          if (gappsData.success && gappsData.fileUrl) {
-            publicPhotoUrl = gappsData.fileUrl;
+          if (gappsData.success && (gappsData.fileUrl || gappsData.webViewLink)) {
+            publicPhotoUrl = gappsData.fileUrl || gappsData.webViewLink;
+            console.log("✅ Photo uploaded to Drive via Google Apps Script:", publicPhotoUrl);
+          } else {
+            console.warn("⚠️ Apps Script Upload Error:", gappsData.error);
           }
         } catch (gappsErr) {
           console.warn("Apps Script Upload warning:", gappsErr);
         }
       }
 
-      // c. Coba Upload Binary File Langsung ke Google Drive Subfolder
-      try {
-        const fileRes = await drive.files.create({
-          requestBody: {
-            name: targetFileName,
-            parents: [folderId],
-            mimeType: "image/png",
-          },
-          media: {
-            mimeType: "image/png",
-            body: Readable.from(photoBuffer),
-          },
-          fields: "id, webViewLink",
-          supportsAllDrives: true,
-        });
-        if (fileRes.data.id) {
-          await drive.permissions.create({
-            fileId: fileRes.data.id,
-            requestBody: { role: "reader", type: "anyone" },
-            supportsAllDrives: true,
-          });
-          publicPhotoUrl = fileRes.data.webViewLink || `https://drive.google.com/uc?export=download&id=${fileRes.data.id}`;
-        }
-      } catch (driveErr: any) {
-        console.log("Info upload binary Drive (Quota fallback):", driveErr.message);
-
-        // d. Fallback: Buat file item di dalam subfolder agar tidak kosong
+      // c. Coba Upload Binary File Langsung ke Google Drive Subfolder (Membutuhkan OAuth / Shared Drive)
+      if (publicPhotoUrl === folderUrl || publicPhotoUrl === localRelativePath) {
         try {
-          await drive.files.create({
+          const fileMime = targetFileName.endsWith(".avif") ? "image/avif" : "image/png";
+          const fileRes = await drive.files.create({
             requestBody: {
               name: targetFileName,
-              mimeType: "application/vnd.google-apps.shortcut",
               parents: [folderId],
-              shortcutDetails: {
-                targetId: parentFolderId,
-              },
+              mimeType: fileMime,
+            },
+            media: {
+              mimeType: fileMime,
+              body: Readable.from(photoBuffer),
             },
             fields: "id, webViewLink",
             supportsAllDrives: true,
           });
-        } catch (scErr) {
-          console.warn("Shortcut fallback error:", scErr);
+          if (fileRes.data.id) {
+            await drive.permissions.create({
+              fileId: fileRes.data.id,
+              requestBody: { role: "reader", type: "anyone" },
+              supportsAllDrives: true,
+            });
+            publicPhotoUrl = fileRes.data.webViewLink || `https://drive.google.com/uc?export=download&id=${fileRes.data.id}`;
+            console.log("✅ Binary file uploaded to Drive directly:", publicPhotoUrl);
+          }
+        } catch (driveErr: any) {
+          console.warn("Direct Drive Upload Info:", driveErr.message);
         }
       }
     }

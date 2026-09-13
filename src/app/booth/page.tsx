@@ -52,12 +52,14 @@ import {
 import Logo from "@/components/Logo";
 import { QRCodeSVG } from "qrcode.react";
 
-// ===== CONSTANTS =====
+// ===== CONSTANTS & ENVIRONMENT CONTROLS =====
 const HIDDEN_TAP_THRESHOLD = 5;
 const HIDDEN_TAP_TIMEOUT = 3000;
 const IDLE_FPS = 6;
 const ACTIVE_FPS = 15;
 const IS_DEBUG = process.env.NEXT_PUBLIC_DEBUG_MODE === "true";
+const ENABLE_PAYMENT = process.env.NEXT_PUBLIC_ENABLE_PAYMENT !== "false";
+const FREE_MODE_POSES = parseInt(process.env.NEXT_PUBLIC_FREE_MODE_POSES || "4", 10);
 
 export type BoothStep =
   | "idle"
@@ -127,6 +129,21 @@ const PACKAGES: PackageItem[] = [
   },
 ];
 
+const DEFAULT_FREE_PACKAGE: PackageItem = {
+  id: "free_session",
+  name: "Free Photobooth Session",
+  price: "Gratis (Free Mode)",
+  rawPrice: 0,
+  poses: FREE_MODE_POSES,
+  gradient: "from-sky-500/20 to-blue-600/20 border-sky-400/40",
+  accentColor: "text-sky-400",
+  features: [
+    `${FREE_MODE_POSES} Pose Film Strip`,
+    "Digital Download QR Code",
+    "Sentuhan Gestur Tangan AI",
+  ],
+};
+
 export default function BoothPage() {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -140,7 +157,13 @@ export default function BoothPage() {
   // Booth State Machine
   const [mounted, setMounted] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
-  const [step, setStep] = useState<BoothStep>("idle");
+  const [stepState, setStepState] = useState<BoothStep>("idle");
+  const stepRef = useRef<BoothStep>("idle");
+  const setStep = useCallback((newStep: BoothStep) => {
+    stepRef.current = newStep;
+    setStepState(newStep);
+  }, []);
+  const step = stepState;
   const [selectedPkg, setSelectedPkg] = useState<PackageItem | null>(null);
 
   // Photo Capture & Selection State
@@ -151,7 +174,9 @@ export default function BoothPage() {
   // Gesture & Cursor Tracking State
   const [lastDetectedGesture, setLastDetectedGesture] = useState<GestureType>("none");
   const [waveDetected, setWaveDetected] = useState(false);
-  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
+  const cursorPosRef = useRef<{ x: number; y: number } | null>(null);
+  const cursorRef = useRef<HTMLDivElement>(null);
+  const callbacksRef = useRef<any>({});
   const [hoveredPkgId, setHoveredPkgId] = useState<string | null>(null);
   const [dwellProgress, setDwellProgress] = useState(0);
 
@@ -159,7 +184,23 @@ export default function BoothPage() {
   const [qrisTimer, setQrisTimer] = useState(5);
   const [photoCountdown, setPhotoCountdown] = useState(3);
   const [qrTimer, setQrTimer] = useState(15);
-  const [emailInput, setEmailInput] = useState("");
+  
+  const [emailInputState, setEmailInputState] = useState("");
+  const emailInputRef = useRef("");
+  const setEmailInput = useCallback((val: string | ((prev: string) => string)) => {
+    if (typeof val === "function") {
+      setEmailInputState((prev) => {
+        const newVal = val(prev);
+        emailInputRef.current = newVal;
+        return newVal;
+      });
+    } else {
+      emailInputRef.current = val;
+      setEmailInputState(val);
+    }
+  }, []);
+  const emailInput = emailInputState;
+
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const isRecordingVoiceRef = useRef(false);
 
@@ -249,11 +290,10 @@ export default function BoothPage() {
     isRecordingVoiceRef.current = false;
   }, []);
 
-  // ===== HANDLE UPLOAD TO GOOGLE DRIVE & EMAIL SERVICE =====
-  const handleFinishUploadAndEmail = useCallback(async (targetEmailInput?: string) => {
-    setStep("qr_download");
+  // ===== HANDLE UPLOAD TO GOOGLE DRIVE =====
+  const handleStartDriveUpload = useCallback(async () => {
+    if (driveFolderUrl || isUploading) return;
     setIsUploading(true);
-    const targetEmailToUse = targetEmailInput !== undefined ? targetEmailInput : emailInput;
 
     let photoDataUrl = capturedPhotos[0] || "";
     if (selectedPhotoIndices.length > 0 && capturedPhotos.length > 0) {
@@ -266,48 +306,58 @@ export default function BoothPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerId: "LAPLACE_ZERO",
-          targetEmail: targetEmailToUse,
           imageBase64: photoDataUrl,
           fileName: "photostrip.png",
         }),
       });
 
       const driveData = await driveRes.json();
-      const folderUrl = driveData.folderUrl || "https://drive.google.com/drive/folders/1IrNwnqXQjo4fG2InPIAWZMgE7n8dmj0K";
-      const folderName = driveData.folderName || "AIBox_Photos";
-
       if (driveData.success) {
-        setDriveFolderUrl(folderUrl);
-        setDriveFolderName(folderName);
+        setDriveFolderUrl(driveData.folderUrl || driveData.publicUrl || "https://drive.google.com/drive/folders/1IrNwnqXQjo4fG2InPIAWZMgE7n8dmj0K");
+        setDriveFolderName(driveData.folderName || "AIBox_Photos");
+      }
+    } catch (err) {
+      console.error("Failed to upload to Google Drive:", err);
+    } finally {
+      setIsUploading(false);
+    }
+  }, [capturedPhotos, selectedPhotoIndices, driveFolderUrl, isUploading]);
+
+  // ===== HANDLE SEND EMAIL & FINISH TO QR DOWNLOAD =====
+  const handleSendEmailAndFinish = useCallback(async (targetEmailInput?: string) => {
+    setStep("qr_download");
+    const targetEmailToUse = targetEmailInput !== undefined ? targetEmailInput : emailInput;
+
+    let photoDataUrl = capturedPhotos[0] || "";
+    if (selectedPhotoIndices.length > 0 && capturedPhotos.length > 0) {
+      photoDataUrl = capturedPhotos[selectedPhotoIndices[0]] || capturedPhotos[0];
+    }
+
+    const emailToSend = targetEmailToUse.trim();
+    if (emailToSend && (emailToSend.includes("@") || emailToSend.length > 3)) {
+      let finalEmailTarget = emailToSend;
+      if (!finalEmailTarget.includes("@")) {
+        finalEmailTarget += "@gmail.com";
       }
 
-      // Pastikan Email Selalu Terkirim Jika Ada Input Email
-      const emailToSend = targetEmailToUse.trim();
-      if (emailToSend && (emailToSend.includes("@") || emailToSend.length > 3)) {
-        let finalEmailTarget = emailToSend;
-        if (!finalEmailTarget.includes("@")) {
-          finalEmailTarget += "@gmail.com";
-        }
-
+      try {
         await fetch("/api/email/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             toEmail: finalEmailTarget,
             userName: "LAPLACE_ZERO",
-            publicPhotoUrl: driveData.publicPhotoUrl || folderUrl,
-            folderUrl: folderUrl,
-            folderName: folderName,
+            publicPhotoUrl: driveFolderUrl || "https://drive.google.com/drive/folders/1IrNwnqXQjo4fG2InPIAWZMgE7n8dmj0K",
+            folderUrl: driveFolderUrl || "https://drive.google.com/drive/folders/1IrNwnqXQjo4fG2InPIAWZMgE7n8dmj0K",
+            folderName: driveFolderName || "AIBox_Photos",
             imageBase64: photoDataUrl,
           }),
         });
+      } catch (err) {
+        console.error("Failed to send email:", err);
       }
-    } catch (err) {
-      console.error("Failed to upload drive and send email:", err);
-    } finally {
-      setIsUploading(false);
     }
-  }, [capturedPhotos, selectedPhotoIndices, emailInput]);
+  }, [capturedPhotos, selectedPhotoIndices, emailInput, driveFolderUrl, driveFolderName]);
 
   // ===== INIT CAMERA & MEDIAPIPE =====
   useEffect(() => {
@@ -383,51 +433,70 @@ export default function BoothPage() {
             const indexTip = result.landmarks[8];
             const px = (1 - indexTip.x) * 100;
             const py = indexTip.y * 100;
-            setCursorPos({ x: px, y: py });
+            cursorPosRef.current = { x: px, y: py };
+            if (cursorRef.current) {
+              cursorRef.current.style.left = `${px}%`;
+              cursorRef.current.style.top = `${py}%`;
+              cursorRef.current.style.opacity = "1";
+            }
+          } else {
+            cursorPosRef.current = null;
+            if (cursorRef.current) {
+              cursorRef.current.style.opacity = "0";
+            }
           }
 
           // 3. IDLE STEP: Active Wave Motion Trigger
-          if (step === "idle" && result.gesture === "wave") {
+          if (stepRef.current === "idle" && result.gesture === "wave") {
             setWaveDetected(true);
             if (!waveTimerRef.current) {
               mediaPipeRef.current?.setTargetFPS(ACTIVE_FPS);
               waveTimerRef.current = setTimeout(() => {
-                setStep("packages");
                 setWaveDetected(false);
+                if (!ENABLE_PAYMENT) {
+                  // Skip payment flow completely! Auto-select free package with FREE_MODE_POSES
+                  callbacksRef.current.setSelectedPkg?.(DEFAULT_FREE_PACKAGE);
+                  callbacksRef.current.setCapturedPhotos?.([]);
+                  callbacksRef.current.setCurrentPoseIndex?.(0);
+                  callbacksRef.current.setStep?.("pose_ready");
+                } else {
+                  callbacksRef.current.setStep?.("packages");
+                }
               }, 1000);
             }
           }
 
           // 4. POSE READY STEP: Peace Gesture ✌️ Trigger Photo Countdown
-          if (step === "pose_ready" && result.gesture === "peace") {
-            setStep("countdown");
+          if (stepRef.current === "pose_ready" && result.gesture === "peace") {
+            callbacksRef.current.setStep?.("countdown");
           }
 
           // 5. CONFIRM & PRINT CONFIRM STEP: Thumbs Up 👍 & Thumbs Down 👎
-          if (step === "confirm") {
+          if (stepRef.current === "confirm") {
             if (result.gesture === "thumbs_up") {
-              handleConfirmYes();
+              callbacksRef.current.handleConfirmYes?.();
             } else if (result.gesture === "thumbs_down") {
-              handleConfirmNo();
+              callbacksRef.current.handleConfirmNo?.();
             }
           }
 
-          if (step === "print_confirm") {
+          if (stepRef.current === "print_confirm") {
             if (result.gesture === "thumbs_up") {
-              setStep("email_input");
+              callbacksRef.current.handleStartDriveUpload?.();
+              callbacksRef.current.setStep?.("email_input");
             } else if (result.gesture === "thumbs_down") {
-              setStep("select_photos");
+              callbacksRef.current.setStep?.("select_photos");
             }
           }
 
           // 6. EMAIL INPUT STEP: Fist ✊ (Start Voice) & Open Palm 🖐️ (Stop Voice)
-          if (step === "email_input") {
+          if (stepRef.current === "email_input") {
             if (result.gesture === "fist") {
               startRecordingVoice();
             } else if (result.gesture === "open_palm") {
               stopRecordingVoice();
             } else if (result.gesture === "thumbs_up") {
-              handleFinishUploadAndEmail();
+              callbacksRef.current.handleSendEmailAndFinish?.(emailInputRef.current);
             }
           }
         });
@@ -447,48 +516,36 @@ export default function BoothPage() {
       if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current);
       cleanup();
     };
-  }, [router, step, startRecordingVoice, stopRecordingVoice]);
+  }, [router, startRecordingVoice, stopRecordingVoice]);
 
   // ===== DWELL HOVER CLICK SIMULATION FOR PACKAGES, PHOTO SELECTION, & ACTIONS =====
   useEffect(() => {
-    if ((step !== "packages" && step !== "select_photos") || !cursorPos) return;
+    const hoverInterval = setInterval(() => {
+      const currentStep = stepRef.current;
+      const currentPos = cursorPosRef.current;
 
-    const elements = document.elementsFromPoint(
-      (cursorPos.x / 100) * window.innerWidth,
-      (cursorPos.y / 100) * window.innerHeight
-    );
-
-    const pkgElem = elements.find((el) => el.getAttribute("data-package-id"));
-    const photoElem = elements.find((el) => el.getAttribute("data-photo-index"));
-    const actionElem = elements.find((el) => el.getAttribute("data-action-id"));
-
-    if (pkgElem && step === "packages") {
-      const pkgId = pkgElem.getAttribute("data-package-id");
-      if (pkgId && pkgId !== hoveredPkgId) {
-        setHoveredPkgId(pkgId);
-        setDwellProgress(0);
-
-        if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
-
-        let startTime = Date.now();
-        dwellTimerRef.current = setInterval(() => {
-          const elapsed = Date.now() - startTime;
-          const pct = Math.min(100, Math.round((elapsed / 1200) * 100));
-          setDwellProgress(pct);
-
-          if (pct >= 100) {
-            clearInterval(dwellTimerRef.current!);
-            const targetPkg = PACKAGES.find((p) => p.id === pkgId);
-            if (targetPkg) handleSelectPackage(targetPkg);
-          }
-        }, 50);
+      if ((currentStep !== "packages" && currentStep !== "select_photos") || !currentPos) {
+        if (hoveredPkgId) {
+          setHoveredPkgId(null);
+          setDwellProgress(0);
+          if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
+        }
+        return;
       }
-    } else if (photoElem && step === "select_photos") {
-      const idxStr = photoElem.getAttribute("data-photo-index");
-      if (idxStr !== null) {
-        const pIdx = parseInt(idxStr, 10);
-        if (`photo-${pIdx}` !== hoveredPkgId) {
-          setHoveredPkgId(`photo-${pIdx}`);
+
+      const elements = document.elementsFromPoint(
+        (currentPos.x / 100) * window.innerWidth,
+        (currentPos.y / 100) * window.innerHeight
+      );
+
+      const pkgElem = elements.find((el) => el.getAttribute("data-package-id"));
+      const photoElem = elements.find((el) => el.getAttribute("data-photo-index"));
+      const actionElem = elements.find((el) => el.getAttribute("data-action-id"));
+
+      if (pkgElem && currentStep === "packages") {
+        const pkgId = pkgElem.getAttribute("data-package-id");
+        if (pkgId && pkgId !== hoveredPkgId) {
+          setHoveredPkgId(pkgId);
           setDwellProgress(0);
 
           if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
@@ -501,45 +558,72 @@ export default function BoothPage() {
 
             if (pct >= 100) {
               clearInterval(dwellTimerRef.current!);
-              togglePhotoSelection(pIdx);
+              const targetPkg = PACKAGES.find((p) => p.id === pkgId);
+              if (targetPkg) callbacksRef.current.handleSelectPackage?.(targetPkg);
             }
           }, 50);
         }
-      }
-    } else if (actionElem && step === "select_photos") {
-      const actId = actionElem.getAttribute("data-action-id");
-      if (actId && `action-${actId}` !== hoveredPkgId) {
-        setHoveredPkgId(`action-${actId}`);
-        setDwellProgress(0);
+      } else if (photoElem && currentStep === "select_photos") {
+        const idxStr = photoElem.getAttribute("data-photo-index");
+        if (idxStr !== null) {
+          const pIdx = parseInt(idxStr, 10);
+          if (`photo-${pIdx}` !== hoveredPkgId) {
+            setHoveredPkgId(`photo-${pIdx}`);
+            setDwellProgress(0);
 
-        if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
+            if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
 
-        let startTime = Date.now();
-        dwellTimerRef.current = setInterval(() => {
-          const elapsed = Date.now() - startTime;
-          const pct = Math.min(100, Math.round((elapsed / 1200) * 100));
-          setDwellProgress(pct);
+            let startTime = Date.now();
+            dwellTimerRef.current = setInterval(() => {
+              const elapsed = Date.now() - startTime;
+              const pct = Math.min(100, Math.round((elapsed / 1200) * 100));
+              setDwellProgress(pct);
 
-          if (pct >= 100) {
-            clearInterval(dwellTimerRef.current!);
-            if (actId === "print") {
-              setStep("print_confirm");
-            } else if (actId === "retake") {
-              setCapturedPhotos([]);
-              setCurrentPoseIndex(0);
-              setStep("pose_ready");
-            }
+              if (pct >= 100) {
+                clearInterval(dwellTimerRef.current!);
+                togglePhotoSelection(pIdx);
+              }
+            }, 50);
           }
-        }, 50);
+        }
+      } else if (actionElem && currentStep === "select_photos") {
+        const actId = actionElem.getAttribute("data-action-id");
+        if (actId && `action-${actId}` !== hoveredPkgId) {
+          setHoveredPkgId(`action-${actId}`);
+          setDwellProgress(0);
+
+          if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
+
+          let startTime = Date.now();
+          dwellTimerRef.current = setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            const pct = Math.min(100, Math.round((elapsed / 1200) * 100));
+            setDwellProgress(pct);
+
+            if (pct >= 100) {
+              clearInterval(dwellTimerRef.current!);
+              if (actId === "print") {
+                callbacksRef.current.handleStartDriveUpload?.();
+                callbacksRef.current.setStep?.("print_confirm");
+              } else if (actId === "retake") {
+                callbacksRef.current.setCapturedPhotos?.([]);
+                callbacksRef.current.setCurrentPoseIndex?.(0);
+                callbacksRef.current.setStep?.("pose_ready");
+              }
+            }
+          }, 50);
+        }
+      } else {
+        if (hoveredPkgId) {
+          setHoveredPkgId(null);
+          setDwellProgress(0);
+          if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
+        }
       }
-    } else {
-      if (hoveredPkgId) {
-        setHoveredPkgId(null);
-        setDwellProgress(0);
-        if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
-      }
-    }
-  }, [cursorPos, step, hoveredPkgId]);
+    }, 100);
+
+    return () => clearInterval(hoverInterval);
+  }, [hoveredPkgId, togglePhotoSelection]);
 
   // ===== QRIS 5-SECOND BYPASS TIMER =====
   useEffect(() => {
@@ -647,15 +731,31 @@ export default function BoothPage() {
   };
 
   const handleSelectPackage = (pkg: PackageItem) => {
-    setSelectedPkg(pkg);
+    const activePkg = !ENABLE_PAYMENT
+      ? { ...pkg, poses: FREE_MODE_POSES, price: "Gratis (Free Mode)" }
+      : pkg;
+    setSelectedPkg(activePkg);
     setHoveredPkgId(null);
     setDwellProgress(0);
     if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
-    setStep("confirm");
+
+    if (!ENABLE_PAYMENT) {
+      setCapturedPhotos([]);
+      setCurrentPoseIndex(0);
+      setStep("pose_ready");
+    } else {
+      setStep("confirm");
+    }
   };
 
   const handleConfirmYes = () => {
-    setStep("qris");
+    if (!ENABLE_PAYMENT) {
+      setCapturedPhotos([]);
+      setCurrentPoseIndex(0);
+      setStep("pose_ready");
+    } else {
+      setStep("qris");
+    }
   };
 
   const handleConfirmNo = () => {
@@ -712,6 +812,18 @@ export default function BoothPage() {
     }
   }, [adminPassword, router]);
 
+  callbacksRef.current = {
+    handleStartDriveUpload,
+    handleSendEmailAndFinish,
+    handleConfirmYes,
+    handleConfirmNo,
+    handleSelectPackage,
+    setCapturedPhotos,
+    setCurrentPoseIndex,
+    setStep,
+    setSelectedPkg,
+  };
+
   if (!mounted) return null;
 
   return (
@@ -738,17 +850,18 @@ export default function BoothPage() {
 
       {/* ===== RELOCATED DEBUG STATUS BADGE (TOP RIGHT) ===== */}
       <div className="absolute top-6 right-8 z-30 flex items-center gap-3 px-4 py-2 glass-dark rounded-full border border-white/10">
-        <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+        <div className={`w-2.5 h-2.5 rounded-full ${!ENABLE_PAYMENT ? "bg-emerald-400" : "bg-red-500"} animate-pulse`} />
         <span className="text-white/90 text-xs font-bold tracking-wider uppercase">
-          AI Photobooth {IS_DEBUG ? "• [DEBUG MODE ON]" : "• Ready"}
+          AI Photobooth {IS_DEBUG ? "• [DEBUG ON]" : !ENABLE_PAYMENT ? `• Free Mode (${FREE_MODE_POSES} Poses)` : "• Ready"}
         </span>
       </div>
 
       {/* ===== GESTURE HAND CURSOR OVERLAY ===== */}
-      {cursorPos && (step === "packages" || step === "select_photos") && (
+      {(step === "packages" || step === "select_photos") && (
         <div
-          className="fixed pointer-events-none z-50 transform -translate-x-1/2 -translate-y-1/2 transition-transform duration-75"
-          style={{ left: `${cursorPos.x}%`, top: `${cursorPos.y}%` }}
+          ref={cursorRef}
+          className="fixed pointer-events-none z-50 transform -translate-x-1/2 -translate-y-1/2 opacity-0"
+          style={{ left: `50%`, top: `50%` }}
         >
           <div className="relative flex items-center justify-center">
             {hoveredPkgId && (
@@ -1343,7 +1456,10 @@ export default function BoothPage() {
 
               <button
                 data-action-id="print"
-                onClick={() => setStep("print_confirm")}
+                onClick={() => {
+                  handleStartDriveUpload();
+                  setStep("print_confirm");
+                }}
                 disabled={selectedPhotoIndices.length === 0}
                 className={`px-8 py-3 rounded-xl font-black text-sm transition-all shadow-xl flex items-center gap-2 disabled:opacity-50 ${
                   hoveredPkgId === "action-print"
@@ -1421,7 +1537,10 @@ export default function BoothPage() {
                 </button>
 
                 <button
-                  onClick={() => setStep("email_input")}
+                  onClick={() => {
+                    handleStartDriveUpload();
+                    setStep("email_input");
+                  }}
                   className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2"
                 >
                   <ThumbsUp className="w-4 h-4" />
@@ -1505,14 +1624,14 @@ export default function BoothPage() {
               {/* Submit Buttons */}
               <div className="flex gap-4">
                 <button
-                  onClick={() => handleFinishUploadAndEmail("")}
+                  onClick={() => handleSendEmailAndFinish("")}
                   className="flex-1 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold text-xs transition-all border border-white/10"
                 >
                   Lewati Email
                 </button>
 
                 <button
-                  onClick={() => handleFinishUploadAndEmail(emailInput)}
+                  onClick={() => handleSendEmailAndFinish(emailInput)}
                   className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl font-bold text-xs transition-all shadow-lg shadow-purple-500/30 flex items-center justify-center gap-1.5"
                 >
                   <ThumbsUp className="w-4 h-4" />
