@@ -4,12 +4,26 @@ import path from "path";
 import fs from "fs";
 import { Readable } from "stream";
 
+function cleanString(val?: string) {
+  if (!val) return "";
+  let str = String(val).trim();
+  while (
+    (str.startsWith('"') && str.endsWith('"')) ||
+    (str.startsWith("'") && str.endsWith("'")) ||
+    (str.startsWith("%22") && str.endsWith("%22"))
+  ) {
+    if (str.startsWith("%22") && str.endsWith("%22")) {
+      str = str.substring(3, str.length - 3).trim();
+    } else {
+      str = str.substring(1, str.length - 1).trim();
+    }
+  }
+  return str.replace(/%22/g, "").replace(/"/g, "").replace(/'/g, "");
+}
+
 function cleanPrivateKey(key?: string) {
   if (!key) return undefined;
-  let k = key.trim();
-  if ((k.startsWith('"') && k.endsWith('"')) || (k.startsWith("'") && k.endsWith("'"))) {
-    k = k.substring(1, k.length - 1);
-  }
+  let k = cleanString(key);
   return k.replace(/\\n/g, "\n");
 }
 
@@ -31,7 +45,7 @@ function getDriveInstance() {
 
   const auth = new google.auth.GoogleAuth({
     credentials: {
-      client_email: process.env.GOOGLE_CLIENT_EMAIL,
+      client_email: cleanString(process.env.GOOGLE_CLIENT_EMAIL),
       private_key: privateKey,
     },
     scopes: ["https://www.googleapis.com/auth/drive"],
@@ -60,7 +74,7 @@ export async function POST(req: Request) {
     const { customerId, targetEmail, imageBase64, fileName, images } = await req.json();
 
     const folderName = generateFolderName(customerId);
-    const parentFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+    const parentFolderId = cleanString(process.env.GOOGLE_DRIVE_FOLDER_ID);
 
     // 1. Kumpulkan semua foto yang akan diupload
     let filesToUpload: { base64?: string; buffer?: Buffer; name: string }[] = [];
@@ -142,8 +156,8 @@ export async function POST(req: Request) {
         });
 
         if (folderRes.data.id) {
-          folderId = folderRes.data.id;
-          folderUrl = folderRes.data.webViewLink || `https://drive.google.com/drive/folders/${folderId}`;
+          folderId = cleanString(folderRes.data.id);
+          folderUrl = cleanString(folderRes.data.webViewLink || `https://drive.google.com/drive/folders/${folderId}`);
 
           try {
             await drive.permissions.create({
@@ -170,7 +184,7 @@ export async function POST(req: Request) {
     }
 
     // Target Folder ID untuk upload file: Subfolder yang baru dibuat ATAU parentFolderId sebagai fallback
-    const targetFolderId = folderId || parentFolderId || "";
+    const targetFolderId = cleanString(folderId || parentFolderId);
 
     if (targetFolderId && !targetFolderId.includes("...")) {
       if (!folderUrl) {
@@ -199,7 +213,7 @@ export async function POST(req: Request) {
         // Opsi A: Google Apps Script Bridge
         if (process.env.GOOGLE_APPS_SCRIPT_URL) {
           try {
-            const gappsRes = await fetch(process.env.GOOGLE_APPS_SCRIPT_URL, {
+            const gappsRes = await fetch(cleanString(process.env.GOOGLE_APPS_SCRIPT_URL), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -211,7 +225,7 @@ export async function POST(req: Request) {
             });
             const gappsData = await gappsRes.json();
             if (gappsData.success && (gappsData.fileUrl || gappsData.webViewLink)) {
-              singleFileUrl = gappsData.fileUrl || gappsData.webViewLink;
+              singleFileUrl = cleanString(gappsData.fileUrl || gappsData.webViewLink);
             }
           } catch (gappsErr) {
             console.warn("Apps Script Upload warning:", gappsErr);
@@ -238,10 +252,10 @@ export async function POST(req: Request) {
             });
 
             if (fileRes.data.id) {
-              singleFileUrl = fileRes.data.webViewLink || `https://drive.google.com/file/d/${fileRes.data.id}/view`;
+              singleFileUrl = cleanString(fileRes.data.webViewLink || `https://drive.google.com/file/d/${fileRes.data.id}/view`);
               try {
                 await drive.permissions.create({
-                  fileId: fileRes.data.id,
+                  fileId: cleanString(fileRes.data.id),
                   requestBody: { role: "reader", type: "anyone" },
                   supportsAllDrives: true,
                 });
@@ -253,7 +267,7 @@ export async function POST(req: Request) {
         }
 
         if (singleFileUrl) {
-          uploadedFileUrls.push(singleFileUrl);
+          uploadedFileUrls.push(cleanString(singleFileUrl));
         }
       }
     }
@@ -262,16 +276,19 @@ export async function POST(req: Request) {
     if (uploadedFileUrls.length > 0) {
       // Prioritaskan file photostrip jika ada, atau file pertama
       const photostripUrl = uploadedFileUrls.find((u) => u.includes("photostrip") || u.endsWith(".png"));
-      publicPhotoUrl = photostripUrl || uploadedFileUrls[0];
+      publicPhotoUrl = cleanString(photostripUrl || uploadedFileUrls[0]);
     }
 
     // Direct Google Drive Fallbacks
     if (!folderUrl) {
       folderUrl = localFolderUrl;
     }
+    folderUrl = cleanString(folderUrl);
+    
     if (!publicPhotoUrl) {
       publicPhotoUrl = folderUrl;
     }
+    publicPhotoUrl = cleanString(publicPhotoUrl);
 
     return NextResponse.json({
       success: true,
