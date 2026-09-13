@@ -294,13 +294,69 @@ export default function BoothPage() {
   }, []);
 
   // ===== HANDLE UPLOAD TO GOOGLE DRIVE =====
+  const generateFilmStrip = async (photoUrls: string[]): Promise<string> => {
+    return new Promise((resolve) => {
+      if (photoUrls.length === 0) return resolve("");
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return resolve("");
+
+      const imgWidth = 600;
+      const imgHeight = 450;
+      const padding = 20;
+      const headerHeight = 80;
+      const footerHeight = 80;
+
+      canvas.width = imgWidth + padding * 2;
+      canvas.height = headerHeight + footerHeight + (imgHeight * photoUrls.length) + (padding * (photoUrls.length - 1));
+
+      ctx.fillStyle = "#0f172a"; 
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 30px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("AI BOX PHOTOGRAPHIC", canvas.width / 2, 50);
+
+      let loaded = 0;
+      const imgs: HTMLImageElement[] = [];
+
+      photoUrls.forEach((url, i) => {
+        const img = new Image();
+        img.onload = () => {
+          loaded++;
+          imgs[i] = img;
+          if (loaded === photoUrls.length) {
+            imgs.forEach((loadedImg, idx) => {
+              const y = headerHeight + (imgHeight * idx) + (padding * idx);
+              ctx.drawImage(loadedImg, padding, y, imgWidth, imgHeight);
+            });
+            ctx.font = "italic 16px Arial";
+            ctx.fillStyle = "#94a3b8";
+            ctx.fillText("Capture your best moments", canvas.width / 2, canvas.height - 30);
+            resolve(canvas.toDataURL("image/jpeg", 0.9));
+          }
+        };
+        img.src = url;
+      });
+    });
+  };
+
   const handleStartDriveUpload = useCallback(async () => {
     if (driveFolderUrl || isUploading) return;
     setIsUploading(true);
 
-    let photoDataUrl = capturedPhotos[0] || "";
-    if (selectedPhotoIndices.length > 0 && capturedPhotos.length > 0) {
-      photoDataUrl = capturedPhotos[selectedPhotoIndices[0]] || capturedPhotos[0];
+    let selectedUrls = selectedPhotoIndices.map(idx => capturedPhotos[idx]).filter(Boolean);
+    if (selectedUrls.length === 0) selectedUrls = [capturedPhotos[0]].filter(Boolean);
+    
+    let imagesToUpload = selectedUrls.map((url, i) => ({
+      base64: url,
+      fileName: `pose_${i+1}.jpg`
+    }));
+
+    const gridBase64 = await generateFilmStrip(selectedUrls);
+    if (gridBase64) {
+      imagesToUpload.push({ base64: gridBase64, fileName: "photostrip.jpg" });
     }
 
     try {
@@ -309,14 +365,13 @@ export default function BoothPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerId: "LAPLACE_ZERO",
-          imageBase64: photoDataUrl,
-          fileName: "photostrip.png",
+          images: imagesToUpload,
         }),
       });
 
       const driveData = await driveRes.json();
       if (driveData.success) {
-        setDriveFolderUrl(driveData.folderUrl || driveData.publicUrl || "https://drive.google.com/drive/folders/1IrNwnqXQjo4fG2InPIAWZMgE7n8dmj0K");
+        setDriveFolderUrl(driveData.folderUrl || driveData.publicUrl || "");
         setDriveFolderName(driveData.folderName || "AIBox_Photos");
       }
     } catch (err) {
@@ -350,10 +405,9 @@ export default function BoothPage() {
           body: JSON.stringify({
             toEmail: finalEmailTarget,
             userName: "LAPLACE_ZERO",
-            publicPhotoUrl: driveFolderUrl || "https://drive.google.com/drive/folders/1IrNwnqXQjo4fG2InPIAWZMgE7n8dmj0K",
-            folderUrl: driveFolderUrl || "https://drive.google.com/drive/folders/1IrNwnqXQjo4fG2InPIAWZMgE7n8dmj0K",
+            publicPhotoUrl: driveFolderUrl || "https://ai-box.id",
+            folderUrl: driveFolderUrl || "https://ai-box.id",
             folderName: driveFolderName || "AIBox_Photos",
-            imageBase64: photoDataUrl,
           }),
         });
       } catch (err) {
@@ -1704,7 +1758,7 @@ export default function BoothPage() {
                 <>
                   <div className="bg-white p-4 rounded-2xl shadow-xl border border-gray-200 inline-block mb-4">
                     <QRCodeSVG
-                      value={driveFolderUrl || "https://drive.google.com/drive/folders/1IrNwnqXQjo4fG2InPIAWZMgE7n8dmj0K"}
+                      value={driveFolderUrl || "https://ai-box.id"}
                       size={180}
                       className="mx-auto"
                     />

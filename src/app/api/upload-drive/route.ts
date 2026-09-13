@@ -46,7 +46,7 @@ function generateFolderName(customerId?: string): string {
 
 export async function POST(req: Request) {
   try {
-    const { customerId, targetEmail, imageBase64, fileName } = await req.json();
+    const { customerId, targetEmail, imageBase64, fileName, images } = await req.json();
 
     const folderName = generateFolderName(customerId);
     const parentFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
@@ -137,24 +137,45 @@ export async function POST(req: Request) {
     let publicPhotoUrl = folderUrl;
     let localRelativePath = "";
 
-    // 5. Tentukan Foto (Dari Kamera atau Default assets/logo/logo-rounded.png)
-    let photoBuffer: Buffer;
-    let targetFileName = fileName || "logo-rounded.png";
-
-    if (imageBase64) {
-      const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-      photoBuffer = Buffer.from(base64Data, "base64");
+    // 5. Kumpulkan semua foto yang akan diupload
+    let filesToUpload: { base64?: string, buffer?: Buffer, name: string }[] = [];
+    
+    if (images && Array.isArray(images)) {
+      filesToUpload = images.map((img: any) => ({
+        base64: img.base64 || img.imageBase64,
+        name: img.fileName || img.name || `photo_${Math.random().toString(36).substring(7)}.jpg`
+      }));
+    } else if (imageBase64) {
+      filesToUpload = [{ base64: imageBase64, name: fileName || "photostrip.png" }];
     } else {
       const defaultLogoPath = path.join(process.cwd(), "assets", "logo", "logo-rounded.png");
       if (fs.existsSync(defaultLogoPath)) {
-        photoBuffer = fs.readFileSync(defaultLogoPath);
-      } else {
-        photoBuffer = Buffer.from("");
+        filesToUpload = [{ buffer: fs.readFileSync(defaultLogoPath), name: "logo-rounded.png" }];
       }
     }
 
-    if (photoBuffer.length > 0) {
-      // a. Simpan Foto Lokal di Server PWA (public/uploads/${folderName}/)
+    // 6. Upload setiap foto ke dalam folder
+    for (const file of filesToUpload) {
+      let photoBuffer: Buffer;
+      
+      if (file.buffer) {
+        photoBuffer = file.buffer;
+      } else if (file.base64) {
+        try {
+          const base64Data = file.base64.replace(/^data:image\/\w+;base64,/, "");
+          photoBuffer = Buffer.from(base64Data, "base64");
+        } catch (e) {
+          continue; // Skip if invalid base64
+        }
+      } else {
+        continue;
+      }
+
+      if (photoBuffer.length === 0) continue;
+
+      const targetFileName = file.name;
+
+      // a. Simpan Foto Lokal di Server PWA
       try {
         const uploadDir = path.join(process.cwd(), "public", "uploads", folderName);
         if (!fs.existsSync(uploadDir)) {
@@ -162,13 +183,13 @@ export async function POST(req: Request) {
         }
         const localFilePath = path.join(uploadDir, targetFileName);
         fs.writeFileSync(localFilePath, photoBuffer);
-        localRelativePath = `/uploads/${folderName}/${targetFileName}`;
-        publicPhotoUrl = localRelativePath;
+        if (!localRelativePath) localRelativePath = `/uploads/${folderName}/${targetFileName}`;
       } catch (localErr) {
         console.warn("Local storage save warning:", localErr);
       }
 
-      // b. Opsi Google Apps Script Bridge (Jika GOOGLE_APPS_SCRIPT_URL diset di .env.local)
+      // b. Opsi Google Apps Script Bridge
+      let uploadedViaScript = false;
       if (process.env.GOOGLE_APPS_SCRIPT_URL) {
         try {
           const gappsRes = await fetch(process.env.GOOGLE_APPS_SCRIPT_URL, {
@@ -178,25 +199,25 @@ export async function POST(req: Request) {
               folderId: folderId,
               fileName: targetFileName,
               imageBase64: photoBuffer.toString("base64"),
-              mimeType: targetFileName.endsWith(".avif") ? "image/avif" : "image/png",
+              mimeType: targetFileName.endsWith(".png") ? "image/png" : "image/jpeg",
             }),
           });
           const gappsData = await gappsRes.json();
           if (gappsData.success && (gappsData.fileUrl || gappsData.webViewLink)) {
-            publicPhotoUrl = gappsData.fileUrl || gappsData.webViewLink;
-            console.log("✅ Photo uploaded to Drive via Google Apps Script:", publicPhotoUrl);
-          } else {
-            console.warn("⚠️ Apps Script Upload Error:", gappsData.error);
+            if (publicPhotoUrl === folderUrl) {
+              publicPhotoUrl = gappsData.fileUrl || gappsData.webViewLink;
+            }
+            uploadedViaScript = true;
           }
         } catch (gappsErr) {
           console.warn("Apps Script Upload warning:", gappsErr);
         }
       }
 
-      // c. Coba Upload Binary File Langsung ke Google Drive Subfolder (Membutuhkan OAuth / Shared Drive)
-      if (publicPhotoUrl === folderUrl || publicPhotoUrl === localRelativePath) {
+      // c. Coba Upload Binary File Langsung ke Google Drive Subfolder
+      if (!uploadedViaScript) {
         try {
-          const fileMime = targetFileName.endsWith(".avif") ? "image/avif" : "image/png";
+          const fileMime = targetFileName.endsWith(".png") ? "image/png" : "image/jpeg";
           const fileRes = await drive.files.create({
             requestBody: {
               name: targetFileName,
@@ -216,8 +237,9 @@ export async function POST(req: Request) {
               requestBody: { role: "reader", type: "anyone" },
               supportsAllDrives: true,
             });
-            publicPhotoUrl = fileRes.data.webViewLink || `https://drive.google.com/uc?export=download&id=${fileRes.data.id}`;
-            console.log("✅ Binary file uploaded to Drive directly:", publicPhotoUrl);
+            if (publicPhotoUrl === folderUrl) {
+              publicPhotoUrl = fileRes.data.webViewLink || `https://drive.google.com/uc?export=download&id=${fileRes.data.id}`;
+            }
           }
         } catch (driveErr: any) {
           console.warn("Direct Drive Upload Info:", driveErr.message);
