@@ -44,11 +44,13 @@ export function buildPhotoboothEmailHtml({
   publicPhotoUrl,
   folderUrl,
   folderName,
+  hasRealPreview = false,
 }: {
   userName: string;
   publicPhotoUrl: string;
   folderUrl: string;
   folderName: string;
+  hasRealPreview?: boolean;
 }) {
   const brandName = "AI Box Photobooth";
 
@@ -140,12 +142,14 @@ export function buildPhotoboothEmailHtml({
                     <img src="cid:qrcodegdrive" alt="QR Code Google Drive" class="qr-img" width="190" height="190"
                          style="display:block;margin:0 auto 16px;width:190px;height:190px;border-radius:12px;border:3px solid #0ea5e9;padding:6px;background-color:#ffffff;box-shadow:0 8px 20px rgba(14,165,233,0.2);" />
 
+                    ${hasRealPreview ? `
                     <!-- PHOTO PREVIEW IMAGE CID -->
-                    <div style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:10px;margin-top:10px;">
+                    <div style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:10px;margin-top:14px;">
                       Preview Hasil Foto Photobooth:
                     </div>
                     <img src="cid:photostrip" alt="Foto Preview" width="320"
                          style="display:block;margin:0 auto;width:100%;max-width:320px;height:auto;border-radius:12px;border:1px solid #cbd5e1;box-shadow:0 4px 12px rgba(0,0,0,0.1);" />
+                    ` : ''}
 
                   </td>
                 </tr>
@@ -250,26 +254,22 @@ export async function sendPhotoboothEmail({
     },
   ];
 
-  // Attach photo preview (Buffer, File Path, atau Fallback assets/logo/logo-rounded.png)
-  const defaultPhotoPath = path.join(process.cwd(), "assets", "logo", "logo-rounded.png");
-  if (photoBuffer) {
+  // Attach photo preview hanya jika photoBuffer atau photoPath asli tersedia (bukan logo icon fallback)
+  let hasRealPreview = false;
+  if (photoBuffer && photoBuffer.length > 50) {
     attachments.push({
-      filename: "logo-rounded.png",
+      filename: "photostrip.jpg",
       content: photoBuffer,
       cid: "photostrip",
     });
+    hasRealPreview = true;
   } else if (photoPath && fs.existsSync(photoPath)) {
     attachments.push({
-      filename: "logo-rounded.png",
+      filename: "photostrip.jpg",
       path: photoPath,
       cid: "photostrip",
     });
-  } else if (fs.existsSync(defaultPhotoPath)) {
-    attachments.push({
-      filename: "logo-rounded.png",
-      path: defaultPhotoPath,
-      cid: "photostrip",
-    });
+    hasRealPreview = true;
   }
 
   // 4. Build HTML Template
@@ -278,6 +278,7 @@ export async function sendPhotoboothEmail({
     publicPhotoUrl,
     folderUrl,
     folderName,
+    hasRealPreview,
   });
 
   const senderEmail = process.env.SMTP_USER || "lookback43210@gmail.com";

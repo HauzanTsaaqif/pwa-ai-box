@@ -220,6 +220,8 @@ export default function BoothPage() {
   const [adminError, setAdminError] = useState("");
   const [hiddenTapCount, setHiddenTapCount] = useState(0);
 
+  const photostripBase64Ref = useRef<string>("");
+
   // ===== CAMERA SNAPSHOT HELPER =====
   const captureSnapshot = useCallback(() => {
     if (!videoRef.current) return null;
@@ -281,7 +283,7 @@ export default function BoothPage() {
       setIsRecordingVoice(false);
       isRecordingVoiceRef.current = false;
     }
-  }, []);
+  }, [setEmailInput]);
 
   const stopRecordingVoice = useCallback(() => {
     if (speechRecognitionRef.current && isRecordingVoiceRef.current) {
@@ -320,6 +322,32 @@ export default function BoothPage() {
       ctx.textAlign = "center";
       ctx.fillText("AI BOX PHOTOGRAPHIC", canvas.width / 2, 50);
 
+      // Fit-Crop (Object-Fit: Cover) helper for 2D Canvas
+      const drawImageCover = (
+        image: HTMLImageElement,
+        x: number,
+        y: number,
+        w: number,
+        h: number
+      ) => {
+        const imgRatio = image.width / image.height;
+        const targetRatio = w / h;
+        let sx = 0;
+        let sy = 0;
+        let sWidth = image.width;
+        let sHeight = image.height;
+
+        if (imgRatio > targetRatio) {
+          sWidth = image.height * targetRatio;
+          sx = (image.width - sWidth) / 2;
+        } else {
+          sHeight = image.width / targetRatio;
+          sy = (image.height - sHeight) / 2;
+        }
+
+        ctx.drawImage(image, sx, sy, sWidth, sHeight, x, y, w, h);
+      };
+
       let loaded = 0;
       const imgs: HTMLImageElement[] = [];
 
@@ -331,7 +359,7 @@ export default function BoothPage() {
           if (loaded === photoUrls.length) {
             imgs.forEach((loadedImg, idx) => {
               const y = headerHeight + (imgHeight * idx) + (padding * idx);
-              ctx.drawImage(loadedImg, padding, y, imgWidth, imgHeight);
+              drawImageCover(loadedImg, padding, y, imgWidth, imgHeight);
             });
             ctx.font = "italic 16px Arial";
             ctx.fillStyle = "#94a3b8";
@@ -357,6 +385,7 @@ export default function BoothPage() {
     }));
 
     const gridBase64 = await generateFilmStrip(selectedUrls);
+    photostripBase64Ref.current = gridBase64;
     if (gridBase64) {
       imagesToUpload.push({ base64: gridBase64, fileName: "photostrip.jpg" });
     }
@@ -410,6 +439,7 @@ export default function BoothPage() {
             publicPhotoUrl: driveFolderUrl,
             folderUrl: driveFolderUrl,
             folderName: driveFolderName || "AIBox_Photos",
+            imageBase64: photostripBase64Ref.current,
           }),
         }).catch((err) => console.error("Failed to send email:", err));
       }
@@ -816,6 +846,7 @@ export default function BoothPage() {
     setDriveFolderName("");
     setIsUploading(false);
     emailPendingTargetRef.current = null;
+    photostripBase64Ref.current = "";
     lastProcessedGestureRef.current = "none";
     if (waveTimerRef.current) {
       clearTimeout(waveTimerRef.current);
