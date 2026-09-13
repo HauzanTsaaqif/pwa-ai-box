@@ -160,6 +160,7 @@ export default function BoothPage() {
   const [stepState, setStepState] = useState<BoothStep>("idle");
   const stepRef = useRef<BoothStep>("idle");
   const stepEntryTimeRef = useRef<number>(Date.now());
+  const lastProcessedGestureRef = useRef<GestureType>("none");
   const setStep = useCallback((newStep: BoothStep) => {
     stepRef.current = newStep;
     stepEntryTimeRef.current = Date.now();
@@ -504,15 +505,23 @@ export default function BoothPage() {
           }
 
           const canTriggerAction = (Date.now() - stepEntryTimeRef.current) > 1000;
+          
+          if (result.gesture === "none") {
+            lastProcessedGestureRef.current = "none";
+          }
+          
+          const isNewGesture = result.gesture !== "none" && result.gesture !== lastProcessedGestureRef.current;
+          const canTriggerNewGestureAction = canTriggerAction && isNewGesture;
 
           // 3. IDLE STEP: Active Wave Motion Trigger
-          if (stepRef.current === "idle" && result.gesture === "wave" && canTriggerAction) {
+          if (stepRef.current === "idle" && result.gesture === "wave" && canTriggerNewGestureAction) {
             setWaveDetected(true);
             if (!waveTimerRef.current) {
               mediaPipeRef.current?.setTargetFPS(ACTIVE_FPS);
               waveTimerRef.current = setTimeout(() => {
                 waveTimerRef.current = null;
                 setWaveDetected(false);
+                lastProcessedGestureRef.current = result.gesture;
                 if (!ENABLE_PAYMENT) {
                   // Skip payment flow completely! Auto-select free package with FREE_MODE_POSES
                   callbacksRef.current.setSelectedPkg?.(DEFAULT_FREE_PACKAGE);
@@ -527,41 +536,49 @@ export default function BoothPage() {
           }
 
           // 4. POSE READY STEP: Peace Gesture ✌️ Trigger Photo Countdown
-          if (stepRef.current === "pose_ready" && result.gesture === "peace" && canTriggerAction) {
+          if (stepRef.current === "pose_ready" && result.gesture === "peace" && canTriggerNewGestureAction) {
+            lastProcessedGestureRef.current = result.gesture;
             callbacksRef.current.setStep?.("countdown");
           }
 
           // 5. CONFIRM & PRINT CONFIRM STEP: Thumbs Up 👍 & Thumbs Down 👎
-          if (stepRef.current === "confirm" && canTriggerAction) {
+          if (stepRef.current === "confirm" && canTriggerNewGestureAction) {
             if (result.gesture === "thumbs_up") {
+              lastProcessedGestureRef.current = result.gesture;
               callbacksRef.current.handleConfirmYes?.();
             } else if (result.gesture === "thumbs_down") {
+              lastProcessedGestureRef.current = result.gesture;
               callbacksRef.current.handleConfirmNo?.();
             }
           }
 
-          if (stepRef.current === "print_confirm" && canTriggerAction) {
+          if (stepRef.current === "print_confirm" && canTriggerNewGestureAction) {
             if (result.gesture === "thumbs_up") {
+              lastProcessedGestureRef.current = result.gesture;
               callbacksRef.current.handleStartDriveUpload?.();
               callbacksRef.current.setStep?.("email_input");
             } else if (result.gesture === "thumbs_down") {
+              lastProcessedGestureRef.current = result.gesture;
               callbacksRef.current.setStep?.("select_photos");
             }
           }
 
           // 6. EMAIL INPUT STEP: Fist ✊ (Start Voice) & Open Palm 🖐️ (Stop Voice)
-          if (stepRef.current === "email_input" && canTriggerAction) {
+          if (stepRef.current === "email_input" && canTriggerNewGestureAction) {
             if (result.gesture === "fist") {
+              lastProcessedGestureRef.current = result.gesture;
               startRecordingVoice();
             } else if (result.gesture === "open_palm") {
+              lastProcessedGestureRef.current = result.gesture;
               stopRecordingVoice();
             } else if (result.gesture === "thumbs_up") {
+              lastProcessedGestureRef.current = result.gesture;
               callbacksRef.current.handleSendEmailAndFinish?.(emailInputRef.current);
             }
           }
 
-          // 7. SCROLL SUPPORT FOR SELECT_PHOTOS
-          if (stepRef.current === "select_photos") {
+          // 7. SCROLL SUPPORT FOR SELECT_PHOTOS (Allow continuous firing so we check canTriggerAction instead of canTriggerNewGestureAction)
+          if (stepRef.current === "select_photos" && canTriggerAction) {
             if (result.gesture === "fist") {
               callbacksRef.current.scrollContainerRef?.current?.scrollBy({ top: 30, behavior: "auto" });
             } else if (result.gesture === "open_palm") {
