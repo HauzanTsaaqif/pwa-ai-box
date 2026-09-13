@@ -345,7 +345,7 @@ export default function BoothPage() {
   };
 
   const handleStartDriveUpload = useCallback(async () => {
-    if (driveFolderUrl || isUploading) return;
+    if (isUploading) return;
     setIsUploading(true);
 
     let selectedUrls = selectedPhotoIndices.map(idx => capturedPhotos[idx]).filter(Boolean);
@@ -381,7 +381,7 @@ export default function BoothPage() {
     } finally {
       setIsUploading(false);
     }
-  }, [capturedPhotos, selectedPhotoIndices, driveFolderUrl, isUploading]);
+  }, [capturedPhotos, selectedPhotoIndices, isUploading]);
 
   // ===== HANDLE SEND EMAIL & FINISH TO QR DOWNLOAD =====
   const handleSendEmailAndFinish = useCallback((targetEmailInput?: string) => {
@@ -563,14 +563,15 @@ export default function BoothPage() {
           }
 
           // 6. EMAIL INPUT STEP: Fist ✊ (Start Voice) & Open Palm 🖐️ (Stop Voice)
-          if (stepRef.current === "email_input" && canTriggerNewGestureAction) {
-            if (result.gesture === "fist") {
+          if (stepRef.current === "email_input") {
+            const canSubmitEmailGesture = (Date.now() - stepEntryTimeRef.current) > 2000;
+            if (result.gesture === "fist" && canTriggerNewGestureAction) {
               lastProcessedGestureRef.current = result.gesture;
-              startRecordingVoice();
-            } else if (result.gesture === "open_palm") {
+              callbacksRef.current.startRecordingVoice?.();
+            } else if (result.gesture === "open_palm" && canTriggerNewGestureAction) {
               lastProcessedGestureRef.current = result.gesture;
-              stopRecordingVoice();
-            } else if (result.gesture === "thumbs_up") {
+              callbacksRef.current.stopRecordingVoice?.();
+            } else if (result.gesture === "thumbs_up" && canSubmitEmailGesture && isNewGesture) {
               lastProcessedGestureRef.current = result.gesture;
               callbacksRef.current.handleSendEmailAndFinish?.(emailInputRef.current);
             }
@@ -601,7 +602,7 @@ export default function BoothPage() {
       if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current);
       cleanup();
     };
-  }, [router, startRecordingVoice, stopRecordingVoice]);
+  }, [router]);
 
   // ===== DWELL HOVER CLICK SIMULATION FOR PACKAGES, PHOTO SELECTION, & ACTIONS =====
   useEffect(() => {
@@ -811,6 +812,11 @@ export default function BoothPage() {
     setEmailInput("");
     setIsRecordingVoice(false);
     setWaveDetected(false);
+    setDriveFolderUrl("");
+    setDriveFolderName("");
+    setIsUploading(false);
+    emailPendingTargetRef.current = null;
+    lastProcessedGestureRef.current = "none";
     if (waveTimerRef.current) {
       clearTimeout(waveTimerRef.current);
       waveTimerRef.current = null;
@@ -914,6 +920,8 @@ export default function BoothPage() {
     setStep,
     setSelectedPkg,
     scrollContainerRef,
+    startRecordingVoice,
+    stopRecordingVoice,
   };
 
   if (!mounted) return null;
@@ -1774,7 +1782,7 @@ export default function BoothPage() {
                 <>
                   <div className="bg-white p-4 rounded-2xl shadow-xl border border-gray-200 inline-block mb-4">
                     <QRCodeSVG
-                      value={driveFolderUrl || "https://ai-box.id"}
+                      value={driveFolderUrl || (typeof window !== "undefined" ? window.location.href : "https://ai-box.id")}
                       size={180}
                       className="mx-auto"
                     />
