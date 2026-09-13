@@ -4,6 +4,15 @@ import path from "path";
 import fs from "fs";
 import { Readable } from "stream";
 
+function cleanPrivateKey(key?: string) {
+  if (!key) return undefined;
+  let k = key.trim();
+  if ((k.startsWith('"') && k.endsWith('"')) || (k.startsWith("'") && k.endsWith("'"))) {
+    k = k.substring(1, k.length - 1);
+  }
+  return k.replace(/\\n/g, "\n");
+}
+
 // Inisialisasi Auth Google API (Mendukung OAuth2 User Token & Service Account)
 function getDriveInstance() {
   if (process.env.GOOGLE_REFRESH_TOKEN && process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
@@ -18,10 +27,12 @@ function getDriveInstance() {
     return google.drive({ version: "v3", auth: oauth2Client });
   }
 
+  const privateKey = cleanPrivateKey(process.env.GOOGLE_PRIVATE_KEY);
+
   const auth = new google.auth.GoogleAuth({
     credentials: {
       client_email: process.env.GOOGLE_CLIENT_EMAIL,
-      private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+      private_key: privateKey,
     },
     scopes: ["https://www.googleapis.com/auth/drive"],
   });
@@ -68,7 +79,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // 2. Simpan Semua Foto Lokal di Server PWA TERLEBIH DAHULU
+    // 2. Simpan Semua Foto Lokal di Server PWA (sebagai backup)
     let localRelativePath = "";
     const host = req.headers.get("host") || "localhost:3000";
     const protocol = req.headers.get("x-forwarded-proto") || "http";
@@ -103,15 +114,15 @@ export async function POST(req: Request) {
     }
 
     let folderId = "";
-    let folderUrl = localFolderUrl;
-    let publicPhotoUrl = localRelativePath ? `${protocol}://${host}${localRelativePath}` : localFolderUrl;
+    let folderUrl = "";
+    let publicPhotoUrl = "";
+    let uploadedFileUrls: string[] = [];
 
-    // 3. Coba integrasi Google Drive API jika parentFolderId dikonfigurasi
+    // 3. Coba buat Subfolder di Google Drive via Service Account
     if (parentFolderId && !parentFolderId.includes("...")) {
       try {
         const drive = getDriveInstance();
 
-        // Pastikan Parent Folder Publik (opsional)
         try {
           await drive.permissions.create({
             fileId: parentFolderId,
@@ -120,7 +131,6 @@ export async function POST(req: Request) {
           });
         } catch (e) {}
 
-        // Buat Subfolder di Google Drive
         const folderRes = await drive.files.create({
           requestBody: {
             name: folderName,
@@ -131,21 +141,17 @@ export async function POST(req: Request) {
           supportsAllDrives: true,
         });
 
-        folderId = folderRes.data.id || "";
-        if (folderId) {
+        if (folderRes.data.id) {
+          folderId = folderRes.data.id;
           folderUrl = folderRes.data.webViewLink || `https://drive.google.com/drive/folders/${folderId}`;
-          publicPhotoUrl = folderUrl;
 
-          // Set Hak Akses Subfolder ke PUBLIC (Anyone with link)
           try {
             await drive.permissions.create({
               fileId: folderId,
               requestBody: { role: "reader", type: "anyone" },
               supportsAllDrives: true,
             });
-          } catch (permErr) {
-            console.warn("Folder public permission warning:", permErr);
-          }
+          } catch (e) {}
 
           if (targetEmail) {
             try {
@@ -155,93 +161,116 @@ export async function POST(req: Request) {
                 supportsAllDrives: true,
                 sendNotificationEmail: false,
               });
-            } catch (err) {
-              console.warn("User permission warning:", err);
-            }
-          }
-
-          // Upload setiap foto ke subfolder Google Drive
-          for (const file of filesToUpload) {
-            let photoBuffer: Buffer | null = null;
-            if (file.buffer) {
-              photoBuffer = file.buffer;
-            } else if (file.base64) {
-              try {
-                const base64Data = file.base64.replace(/^data:image\/\w+;base64,/, "");
-                photoBuffer = Buffer.from(base64Data, "base64");
-              } catch (e) {
-                photoBuffer = null;
-              }
-            }
-
-            if (!photoBuffer || photoBuffer.length === 0) continue;
-
-            const targetFileName = file.name;
-
-            // Opsi Google Apps Script Bridge
-            let uploadedViaScript = false;
-            if (process.env.GOOGLE_APPS_SCRIPT_URL) {
-              try {
-                const gappsRes = await fetch(process.env.GOOGLE_APPS_SCRIPT_URL, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    folderId: folderId,
-                    fileName: targetFileName,
-                    imageBase64: photoBuffer.toString("base64"),
-                    mimeType: targetFileName.endsWith(".png") ? "image/png" : "image/jpeg",
-                  }),
-                });
-                const gappsData = await gappsRes.json();
-                if (gappsData.success && (gappsData.fileUrl || gappsData.webViewLink)) {
-                  if (publicPhotoUrl === folderUrl) {
-                    publicPhotoUrl = gappsData.fileUrl || gappsData.webViewLink;
-                  }
-                  uploadedViaScript = true;
-                }
-              } catch (gappsErr) {
-                console.warn("Apps Script Upload warning:", gappsErr);
-              }
-            }
-
-            // Direct Drive Upload Fallback
-            if (!uploadedViaScript) {
-              try {
-                const fileMime = targetFileName.endsWith(".png") ? "image/png" : "image/jpeg";
-                const fileRes = await drive.files.create({
-                  requestBody: {
-                    name: targetFileName,
-                    parents: [folderId],
-                    mimeType: fileMime,
-                  },
-                  media: {
-                    mimeType: fileMime,
-                    body: Readable.from(photoBuffer),
-                  },
-                  fields: "id, webViewLink",
-                  supportsAllDrives: true,
-                });
-                if (fileRes.data.id) {
-                  try {
-                    await drive.permissions.create({
-                      fileId: fileRes.data.id,
-                      requestBody: { role: "reader", type: "anyone" },
-                      supportsAllDrives: true,
-                    });
-                  } catch (e) {}
-                  if (publicPhotoUrl === folderUrl) {
-                    publicPhotoUrl = fileRes.data.webViewLink || `https://drive.google.com/uc?export=download&id=${fileRes.data.id}`;
-                  }
-                }
-              } catch (driveErr: any) {
-                console.warn("Direct Drive Upload Warning:", driveErr.message);
-              }
-            }
+            } catch (e) {}
           }
         }
-      } catch (driveApiErr: any) {
-        console.warn("Google Drive API primary handler warning:", driveApiErr?.message || driveApiErr);
+      } catch (driveErr: any) {
+        console.warn("Service Account folder creation warning:", driveErr?.message || driveErr);
       }
+    }
+
+    // Target Folder ID untuk upload file: Subfolder yang baru dibuat ATAU parentFolderId sebagai fallback
+    const targetFolderId = folderId || parentFolderId || "";
+
+    if (targetFolderId && !targetFolderId.includes("...")) {
+      if (!folderUrl) {
+        folderUrl = `https://drive.google.com/drive/folders/${targetFolderId}`;
+      }
+
+      // 4. Upload Setiap Foto ke Google Drive
+      for (const file of filesToUpload) {
+        let photoBuffer: Buffer | null = null;
+        if (file.buffer) {
+          photoBuffer = file.buffer;
+        } else if (file.base64) {
+          try {
+            const base64Data = file.base64.replace(/^data:image\/\w+;base64,/, "");
+            photoBuffer = Buffer.from(base64Data, "base64");
+          } catch (e) {
+            photoBuffer = null;
+          }
+        }
+
+        if (!photoBuffer || photoBuffer.length === 0) continue;
+
+        const targetFileName = file.name;
+        let singleFileUrl = "";
+
+        // Opsi A: Google Apps Script Bridge
+        if (process.env.GOOGLE_APPS_SCRIPT_URL) {
+          try {
+            const gappsRes = await fetch(process.env.GOOGLE_APPS_SCRIPT_URL, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                folderId: targetFolderId,
+                fileName: targetFileName,
+                imageBase64: photoBuffer.toString("base64"),
+                mimeType: targetFileName.endsWith(".png") ? "image/png" : "image/jpeg",
+              }),
+            });
+            const gappsData = await gappsRes.json();
+            if (gappsData.success && (gappsData.fileUrl || gappsData.webViewLink)) {
+              singleFileUrl = gappsData.fileUrl || gappsData.webViewLink;
+            }
+          } catch (gappsErr) {
+            console.warn("Apps Script Upload warning:", gappsErr);
+          }
+        }
+
+        // Opsi B: Direct Service Account Upload
+        if (!singleFileUrl) {
+          try {
+            const drive = getDriveInstance();
+            const fileMime = targetFileName.endsWith(".png") ? "image/png" : "image/jpeg";
+            const fileRes = await drive.files.create({
+              requestBody: {
+                name: targetFileName,
+                parents: [targetFolderId],
+                mimeType: fileMime,
+              },
+              media: {
+                mimeType: fileMime,
+                body: Readable.from(photoBuffer),
+              },
+              fields: "id, webViewLink",
+              supportsAllDrives: true,
+            });
+
+            if (fileRes.data.id) {
+              singleFileUrl = fileRes.data.webViewLink || `https://drive.google.com/file/d/${fileRes.data.id}/view`;
+              try {
+                await drive.permissions.create({
+                  fileId: fileRes.data.id,
+                  requestBody: { role: "reader", type: "anyone" },
+                  supportsAllDrives: true,
+                });
+              } catch (e) {}
+            }
+          } catch (driveErr: any) {
+            console.warn("Direct Drive Upload Warning:", driveErr.message);
+          }
+        }
+
+        if (singleFileUrl) {
+          uploadedFileUrls.push(singleFileUrl);
+        }
+      }
+    }
+
+    // Jika ada file yang berhasil diupload ke Google Drive, gunakan file URL tersebut sebagai publicPhotoUrl
+    if (uploadedFileUrls.length > 0) {
+      // Prioritaskan file photostrip jika ada, atau file pertama
+      const photostripUrl = uploadedFileUrls.find((u) => u.includes("photostrip") || u.endsWith(".png"));
+      publicPhotoUrl = photostripUrl || uploadedFileUrls[0];
+    }
+
+    // Direct Google Drive Fallbacks
+    if (!folderUrl) {
+      folderUrl = localFolderUrl;
+    }
+    if (!publicPhotoUrl) {
+      publicPhotoUrl = folderUrl;
     }
 
     return NextResponse.json({
@@ -252,6 +281,7 @@ export async function POST(req: Request) {
       publicPhotoUrl,
       localPhotoUrl: localRelativePath,
       publicUrl: folderUrl,
+      uploadedFileUrls,
     });
   } catch (error: any) {
     console.error("Upload API Error:", error);
