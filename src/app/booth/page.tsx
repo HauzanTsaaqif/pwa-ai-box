@@ -159,8 +159,10 @@ export default function BoothPage() {
   const [cameraReady, setCameraReady] = useState(false);
   const [stepState, setStepState] = useState<BoothStep>("idle");
   const stepRef = useRef<BoothStep>("idle");
+  const stepEntryTimeRef = useRef<number>(Date.now());
   const setStep = useCallback((newStep: BoothStep) => {
     stepRef.current = newStep;
+    stepEntryTimeRef.current = Date.now();
     setStepState(newStep);
   }, []);
   const step = stepState;
@@ -176,6 +178,7 @@ export default function BoothPage() {
   const [waveDetected, setWaveDetected] = useState(false);
   const cursorPosRef = useRef<{ x: number; y: number } | null>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const callbacksRef = useRef<any>({});
   const [hoveredPkgId, setHoveredPkgId] = useState<string | null>(null);
   const [dwellProgress, setDwellProgress] = useState(0);
@@ -446,12 +449,15 @@ export default function BoothPage() {
             }
           }
 
+          const canTriggerAction = (Date.now() - stepEntryTimeRef.current) > 1000;
+
           // 3. IDLE STEP: Active Wave Motion Trigger
-          if (stepRef.current === "idle" && result.gesture === "wave") {
+          if (stepRef.current === "idle" && result.gesture === "wave" && canTriggerAction) {
             setWaveDetected(true);
             if (!waveTimerRef.current) {
               mediaPipeRef.current?.setTargetFPS(ACTIVE_FPS);
               waveTimerRef.current = setTimeout(() => {
+                waveTimerRef.current = null;
                 setWaveDetected(false);
                 if (!ENABLE_PAYMENT) {
                   // Skip payment flow completely! Auto-select free package with FREE_MODE_POSES
@@ -467,12 +473,12 @@ export default function BoothPage() {
           }
 
           // 4. POSE READY STEP: Peace Gesture ✌️ Trigger Photo Countdown
-          if (stepRef.current === "pose_ready" && result.gesture === "peace") {
+          if (stepRef.current === "pose_ready" && result.gesture === "peace" && canTriggerAction) {
             callbacksRef.current.setStep?.("countdown");
           }
 
           // 5. CONFIRM & PRINT CONFIRM STEP: Thumbs Up 👍 & Thumbs Down 👎
-          if (stepRef.current === "confirm") {
+          if (stepRef.current === "confirm" && canTriggerAction) {
             if (result.gesture === "thumbs_up") {
               callbacksRef.current.handleConfirmYes?.();
             } else if (result.gesture === "thumbs_down") {
@@ -480,7 +486,7 @@ export default function BoothPage() {
             }
           }
 
-          if (stepRef.current === "print_confirm") {
+          if (stepRef.current === "print_confirm" && canTriggerAction) {
             if (result.gesture === "thumbs_up") {
               callbacksRef.current.handleStartDriveUpload?.();
               callbacksRef.current.setStep?.("email_input");
@@ -490,13 +496,22 @@ export default function BoothPage() {
           }
 
           // 6. EMAIL INPUT STEP: Fist ✊ (Start Voice) & Open Palm 🖐️ (Stop Voice)
-          if (stepRef.current === "email_input") {
+          if (stepRef.current === "email_input" && canTriggerAction) {
             if (result.gesture === "fist") {
               startRecordingVoice();
             } else if (result.gesture === "open_palm") {
               stopRecordingVoice();
             } else if (result.gesture === "thumbs_up") {
               callbacksRef.current.handleSendEmailAndFinish?.(emailInputRef.current);
+            }
+          }
+
+          // 7. SCROLL SUPPORT FOR SELECT_PHOTOS
+          if (stepRef.current === "select_photos") {
+            if (result.gesture === "fist") {
+              callbacksRef.current.scrollContainerRef?.current?.scrollBy({ top: 30, behavior: "auto" });
+            } else if (result.gesture === "open_palm") {
+              callbacksRef.current.scrollContainerRef?.current?.scrollBy({ top: -30, behavior: "auto" });
             }
           }
         });
@@ -726,8 +741,14 @@ export default function BoothPage() {
     setEmailInput("");
     setIsRecordingVoice(false);
     setWaveDetected(false);
-    if (waveTimerRef.current) clearTimeout(waveTimerRef.current);
-    if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current);
+    if (waveTimerRef.current) {
+      clearTimeout(waveTimerRef.current);
+      waveTimerRef.current = null;
+    }
+    if (dwellTimerRef.current) {
+      clearTimeout(dwellTimerRef.current);
+      dwellTimerRef.current = null;
+    }
   }
 
   function handleSelectPackage(pkg: PackageItem) {
@@ -822,6 +843,7 @@ export default function BoothPage() {
     setCurrentPoseIndex,
     setStep,
     setSelectedPkg,
+    scrollContainerRef,
   };
 
   if (!mounted) return null;
@@ -1353,10 +1375,11 @@ export default function BoothPage() {
         {step === "select_photos" && selectedPkg && (
           <motion.div
             key="select_photos"
+            ref={scrollContainerRef}
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="absolute inset-0 z-30 flex flex-col items-center justify-between p-6 sm:p-10 text-center bg-dark/95"
+            className="absolute inset-0 z-30 flex flex-col items-center justify-between p-6 sm:p-10 text-center bg-dark/95 overflow-y-auto"
           >
             <div className="mt-2">
               <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
