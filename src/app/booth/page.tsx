@@ -717,7 +717,7 @@ export default function BoothPage() {
   }, [step]);
 
   // ===== ACTION HANDLERS =====
-  const resetAllToIdle = () => {
+  function resetAllToIdle() {
     setStep("idle");
     setSelectedPkg(null);
     setCapturedPhotos([]);
@@ -728,9 +728,9 @@ export default function BoothPage() {
     setWaveDetected(false);
     if (waveTimerRef.current) clearTimeout(waveTimerRef.current);
     if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current);
-  };
+  }
 
-  const handleSelectPackage = (pkg: PackageItem) => {
+  function handleSelectPackage(pkg: PackageItem) {
     const activePkg = !ENABLE_PAYMENT
       ? { ...pkg, poses: FREE_MODE_POSES, price: "Gratis (Free Mode)" }
       : pkg;
@@ -746,9 +746,9 @@ export default function BoothPage() {
     } else {
       setStep("confirm");
     }
-  };
+  }
 
-  const handleConfirmYes = () => {
+  function handleConfirmYes() {
     if (!ENABLE_PAYMENT) {
       setCapturedPhotos([]);
       setCurrentPoseIndex(0);
@@ -756,20 +756,20 @@ export default function BoothPage() {
     } else {
       setStep("qris");
     }
-  };
+  }
 
-  const handleConfirmNo = () => {
+  function handleConfirmNo() {
     setSelectedPkg(null);
     setStep("packages");
-  };
+  }
 
-  const togglePhotoSelection = (index: number) => {
+  function togglePhotoSelection(index: number) {
     setSelectedPhotoIndices((prev) =>
       prev.includes(index)
         ? prev.filter((i) => i !== index)
         : [...prev, index]
     );
-  };
+  }
 
   // ===== CLEANUP =====
   const cleanup = useCallback(() => {
