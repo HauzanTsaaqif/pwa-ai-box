@@ -62,7 +62,7 @@ import { QRCodeSVG } from "qrcode.react";
 const HIDDEN_TAP_THRESHOLD = 5;
 const HIDDEN_TAP_TIMEOUT = 3000;
 const IDLE_FPS = 10;
-const ACTIVE_FPS = 30;
+const ACTIVE_FPS = 20; // 20 FPS detection + 60 FPS lerp ensures video feed never stutters
 const IS_DEBUG = process.env.NEXT_PUBLIC_DEBUG_MODE === "true";
 const ENABLE_PAYMENT = process.env.NEXT_PUBLIC_ENABLE_PAYMENT !== "false";
 const FREE_MODE_POSES = parseInt(process.env.NEXT_PUBLIC_FREE_MODE_POSES || "4", 10);
@@ -283,11 +283,13 @@ export default function BoothPage() {
     stepEntryTimeRef.current = Date.now();
     dwellCooldownRef.current = Date.now() + 800; // 0.8s cooldown on every step change
     mustExitBeforeSelectRef.current = true; // User must exit previous hover zone first!
+    if (activeTargetRef.current) {
+      clearDwellProgressDOM(activeTargetRef.current);
+    }
     activeTargetRef.current = null;
     activeTargetIdRef.current = null;
     setLockedSelectionId(null);
     setHoveredItemId(null);
-    setDwellProgress(0);
     setStepState(newStep);
   }, []);
   const step = stepState;
@@ -302,11 +304,45 @@ export default function BoothPage() {
   const [isHandDetected, setIsHandDetected] = useState<boolean>(false);
   const isHandDetectedRef = useRef<boolean>(false);
   const cursorPosRef = useRef<{ x: number; y: number } | null>(null);
+  const targetCursorPosRef = useRef<{ x: number; y: number } | null>(null);
+  const smoothCursorPosRef = useRef<{ x: number; y: number } | null>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
+  const cursorCircleRef = useRef<SVGCircleElement>(null);
+  const cursorPercentRef = useRef<HTMLDivElement>(null);
   const targetCircleRef = useRef<HTMLDivElement>(null);
   const callbacksRef = useRef<any>({});
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
-  const [dwellProgress, setDwellProgress] = useState(0);
+
+  // Direct DOM updates for zero-re-render dwell progress
+  const updateDwellProgressDOM = (pct: number, target: HTMLElement | null) => {
+    if (cursorCircleRef.current) {
+      cursorCircleRef.current.style.strokeDashoffset = `${176 - (176 * pct) / 100}`;
+    }
+    if (cursorPercentRef.current) {
+      cursorPercentRef.current.textContent = `${pct}%`;
+    }
+    if (target) {
+      const bar = target.querySelector(".dwell-bar") as HTMLElement | null;
+      if (bar) bar.style.width = `${pct}%`;
+      const label = target.querySelector(".dwell-label") as HTMLElement | null;
+      if (label) label.textContent = `Mengunci (${pct}%)...`;
+    }
+  };
+
+  const clearDwellProgressDOM = (target: HTMLElement | null) => {
+    if (cursorCircleRef.current) {
+      cursorCircleRef.current.style.strokeDashoffset = "176";
+    }
+    if (cursorPercentRef.current) {
+      cursorPercentRef.current.textContent = "0%";
+    }
+    if (target) {
+      const bar = target.querySelector(".dwell-bar") as HTMLElement | null;
+      if (bar) bar.style.width = "0%";
+      const label = target.querySelector(".dwell-label") as HTMLElement | null;
+      if (label) label.textContent = "Pilih";
+    }
+  };
 
   // Interactive Gesture Tutorial State
   const [tutorialProgress, setTutorialProgress] = useState(0);
@@ -672,8 +708,9 @@ export default function BoothPage() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            width: { ideal: 1280, max: 1920 },
+            height: { ideal: 720, max: 1080 },
+            frameRate: { ideal: 30, min: 24 },
             facingMode: "user",
           },
           audio: false,
@@ -750,19 +787,12 @@ export default function BoothPage() {
           // Track Hand Gesture Cursor Position (Index Finger Tip #8)
           if (hasHand && result.landmarks[8]) {
             const indexTip = result.landmarks[8];
-            const px = (1 - indexTip.x) * 100;
-            const py = indexTip.y * 100;
-            cursorPosRef.current = { x: px, y: py };
-            if (cursorRef.current) {
-              cursorRef.current.style.left = `${px}%`;
-              cursorRef.current.style.top = `${py}%`;
-              cursorRef.current.style.opacity = "1";
-            }
+            targetCursorPosRef.current = {
+              x: (1 - indexTip.x) * 100,
+              y: indexTip.y * 100,
+            };
           } else {
-            cursorPosRef.current = null;
-            if (cursorRef.current) {
-              cursorRef.current.style.opacity = "0";
-            }
+            targetCursorPosRef.current = null;
           }
 
           const canTriggerAction = Date.now() - stepEntryTimeRef.current > 1000;
@@ -820,6 +850,39 @@ export default function BoothPage() {
     };
   }, [router]);
 
+  // ===== 60 FPS HARDWARE ACCELERATED LERP CURSOR LOOP =====
+  useEffect(() => {
+    let animId: number;
+    const loop = () => {
+      const target = targetCursorPosRef.current;
+      if (target) {
+        if (!smoothCursorPosRef.current) {
+          smoothCursorPosRef.current = { x: target.x, y: target.y };
+        } else {
+          // Lerp factor 0.45: smooth out camera jitter, instant response, 60fps buttery movement
+          smoothCursorPosRef.current.x += (target.x - smoothCursorPosRef.current.x) * 0.45;
+          smoothCursorPosRef.current.y += (target.y - smoothCursorPosRef.current.y) * 0.45;
+        }
+        cursorPosRef.current = smoothCursorPosRef.current;
+        if (cursorRef.current) {
+          const screenX = (smoothCursorPosRef.current.x / 100) * window.innerWidth;
+          const screenY = (smoothCursorPosRef.current.y / 100) * window.innerHeight;
+          cursorRef.current.style.transform = `translate3d(${screenX}px, ${screenY}px, 0)`;
+          cursorRef.current.style.opacity = "1";
+        }
+      } else {
+        smoothCursorPosRef.current = null;
+        cursorPosRef.current = null;
+        if (cursorRef.current) {
+          cursorRef.current.style.opacity = "0";
+        }
+      }
+      animId = requestAnimationFrame(loop);
+    };
+    animId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animId);
+  }, []);
+
   // ===== INTERACTIVE GESTURE TUTORIAL / WARM-UP DETECTION (DYNAMIC BOUNDING RECT) =====
   useEffect(() => {
     if (step !== "gesture_tutorial") return;
@@ -869,7 +932,7 @@ export default function BoothPage() {
     return () => clearInterval(interval);
   }, [step, setStep]);
 
-  // ===== UNIVERSAL DWELL HOVER CLICK WITH 1.8s DELIBERATE LOCK & ALL-BUTTON SUPPORT =====
+  // ===== ZERO-RE-RENDER UNIVERSAL DWELL HOVER CLICK WITH 1.8s DELIBERATE LOCK =====
   useEffect(() => {
     const DWELL_LOCK_MS = 1800; // 1.8s deliberate lock to prevent accidental quick triggers
 
@@ -885,10 +948,10 @@ export default function BoothPage() {
 
       if (nonClickableSteps || !currentPos || Date.now() < dwellCooldownRef.current || isTransitioningRef.current) {
         if (activeTargetRef.current) {
+          clearDwellProgressDOM(activeTargetRef.current);
           activeTargetRef.current = null;
           activeTargetIdRef.current = null;
           setHoveredItemId(null);
-          setDwellProgress(0);
         }
         return;
       }
@@ -927,10 +990,10 @@ export default function BoothPage() {
         ) {
           // Hand is still inside previous box: keep idle, do not dwell
           if (activeTargetRef.current) {
+            clearDwellProgressDOM(activeTargetRef.current);
             activeTargetRef.current = null;
             activeTargetIdRef.current = null;
             setHoveredItemId(null);
-            setDwellProgress(0);
           }
           return;
         } else {
@@ -950,31 +1013,34 @@ export default function BoothPage() {
 
         if (interactiveTarget !== activeTargetRef.current) {
           // New target hovered
+          if (activeTargetRef.current) {
+            clearDwellProgressDOM(activeTargetRef.current);
+          }
           activeTargetRef.current = interactiveTarget;
           activeTargetIdRef.current = targetId;
           dwellStartTimeRef.current = Date.now();
           setHoveredItemId(targetId);
-          setDwellProgress(0);
+          updateDwellProgressDOM(0, interactiveTarget);
         } else {
-          // Continuing hover on the same target: increment progress smoothly!
+          // Continuing hover on the same target: increment progress smoothly via DOM (NO React re-render)
           const elapsed = Date.now() - dwellStartTimeRef.current;
           const pct = Math.min(100, Math.round((elapsed / DWELL_LOCK_MS) * 100));
-          setDwellProgress(pct);
+          updateDwellProgressDOM(pct, interactiveTarget);
 
           if (pct >= 100) {
             mustExitBeforeSelectRef.current = true;
             lastSelectedElementRef.current = interactiveTarget;
+            clearDwellProgressDOM(interactiveTarget);
             activeTargetRef.current = null;
             activeTargetIdRef.current = null;
             setHoveredItemId(null);
-            setDwellProgress(0);
 
             // Execute click with both synthetic MouseEvent and native .click()
             try {
               interactiveTarget.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window }));
               interactiveTarget.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, view: window }));
               interactiveTarget.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
-            } catch (err) {}
+            } catch (err) { }
             interactiveTarget.click();
           }
         }
@@ -983,13 +1049,13 @@ export default function BoothPage() {
         mustExitBeforeSelectRef.current = false;
         lastSelectedElementRef.current = null;
         if (activeTargetRef.current) {
+          clearDwellProgressDOM(activeTargetRef.current);
           activeTargetRef.current = null;
           activeTargetIdRef.current = null;
           setHoveredItemId(null);
-          setDwellProgress(0);
         }
       }
-    }, 30);
+    }, 25);
 
     return () => clearInterval(hoverInterval);
   }, []);
@@ -1001,7 +1067,7 @@ export default function BoothPage() {
     setLockedSelectionId(pkg.id);
     setSelectedPkg(pkg);
     setHoveredItemId(null);
-    setDwellProgress(0);
+    if (activeTargetRef.current) clearDwellProgressDOM(activeTargetRef.current);
     if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
 
     setTimeout(() => {
@@ -1016,7 +1082,7 @@ export default function BoothPage() {
     setLockedSelectionId(fmt.id);
     setSelectedFormat(fmt);
     setHoveredItemId(null);
-    setDwellProgress(0);
+    if (activeTargetRef.current) clearDwellProgressDOM(activeTargetRef.current);
     if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
 
     setTimeout(() => {
@@ -1031,7 +1097,7 @@ export default function BoothPage() {
     setLockedSelectionId(thm.id);
     setSelectedTheme(thm);
     setHoveredItemId(null);
-    setDwellProgress(0);
+    if (activeTargetRef.current) clearDwellProgressDOM(activeTargetRef.current);
     if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
 
     setTimeout(() => {
@@ -1271,7 +1337,7 @@ export default function BoothPage() {
         autoPlay
         playsInline
         muted
-        className="camera-feed absolute inset-0 -scale-x-100 filter brightness-[1.02] contrast-[1.04]"
+        className="camera-feed absolute inset-0 -scale-x-100 will-change-transform"
       />
 
       {/* Hand Skeleton Overlay Canvas */}
@@ -1319,7 +1385,7 @@ export default function BoothPage() {
       {cameraReady && step !== "welcome_intro" && (
         <div
           ref={cursorRef}
-          className="fixed pointer-events-none z-50 transform -translate-x-1/2 -translate-y-1/2 transition-opacity duration-150 opacity-0"
+          className="fixed top-0 left-0 pointer-events-none z-50 -ml-[35px] -mt-[35px] transition-opacity duration-150 opacity-0 will-change-transform"
           style={{ width: "70px", height: "70px" }}
         >
           <div className="relative w-full h-full flex items-center justify-center">
@@ -1335,21 +1401,25 @@ export default function BoothPage() {
                     fill="none"
                   />
                   <circle
+                    ref={cursorCircleRef}
                     cx="35"
                     cy="35"
                     r="28"
                     stroke="#f0a25c"
                     strokeWidth="4"
                     strokeDasharray="176"
-                    strokeDashoffset={176 - (176 * dwellProgress) / 100}
+                    strokeDashoffset={176}
                     strokeLinecap="round"
                     fill="none"
                     className="transition-all duration-75 drop-shadow-[0_0_10px_#f0a25c]"
                   />
                 </svg>
                 {/* Dwell percentage lock pill */}
-                <div className="absolute -bottom-6 px-1.5 py-0.5 rounded bg-black/85 border border-[#f0a25c]/50 font-mono-tech text-[9px] font-bold text-[#f0a25c] tracking-wider pointer-events-none shadow-md">
-                  {dwellProgress}%
+                <div
+                  ref={cursorPercentRef}
+                  className="absolute -bottom-6 px-1.5 py-0.5 rounded bg-black/85 border border-[#f0a25c]/50 font-mono-tech text-[9px] font-bold text-[#f0a25c] tracking-wider pointer-events-none shadow-md"
+                >
+                  0%
                 </div>
               </>
             )}
@@ -1392,16 +1462,6 @@ export default function BoothPage() {
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[380px] bg-gradient-to-b from-[#2e3247]/30 to-transparent rounded-full blur-[120px] pointer-events-none" />
 
             <div className="relative z-10 flex flex-col items-center max-w-3xl px-4">
-              {/* Studio Telemetry Badge with Camera Aperture */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.1 }}
-                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#f0a25c]/10 border border-[#f0a25c]/30 text-[#f0a25c] text-[11px] font-mono-tech tracking-widest uppercase mb-7 shadow-[0_0_20px_rgba(240,162,92,0.15)]"
-              >
-                <Camera className="w-3.5 h-3.5 text-[#f0a25c] animate-pulse" />
-                <span>STUDIO STROBE READY // AF-LOCK 50MM</span>
-              </motion.div>
 
               {/* Viewfinder Target Framing Around Title */}
               <motion.div
@@ -1418,10 +1478,7 @@ export default function BoothPage() {
 
                 <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-[-0.06em] leading-[0.96] text-white">
                   <span className="block drop-shadow-[0_4px_20px_rgba(0,0,0,0.8)]">
-                    Capture Your Essence,
-                  </span>
-                  <span className="block mt-2 bg-gradient-to-r from-[#f0a25c] via-[#ffedd5] to-[#f0a25c] bg-clip-text text-transparent bg-[length:200%_auto] animate-pulse">
-                    Elevated by aibox.
+                    Capture Your Moments!
                   </span>
                 </h1>
               </motion.div>
@@ -1463,11 +1520,10 @@ export default function BoothPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className={`absolute inset-0 z-30 flex flex-col items-center justify-between p-6 sm:p-10 text-center transition-all duration-500 ${
-              isHandDetected
-                ? "bg-[#090a12]/45 backdrop-blur-none"
-                : "bg-[#090a12]/80 backdrop-blur-md"
-            }`}
+            className={`absolute inset-0 z-30 flex flex-col items-center justify-between p-6 sm:p-10 text-center transition-all duration-500 ${isHandDetected
+              ? "bg-[#090a12]/45 backdrop-blur-none"
+              : "bg-[#090a12]/80 backdrop-blur-md"
+              }`}
           >
             {/* Top Prompt */}
             <div className="mt-8 max-w-md">
@@ -1495,13 +1551,12 @@ export default function BoothPage() {
                     : { scale: [1, 1.05, 1] }
                 }
                 transition={{ duration: 1.5, repeat: Infinity }}
-                className={`relative w-44 h-44 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
-                  tutorialCompleted
-                    ? "bg-emerald-500/20 border-emerald-400 shadow-[0_0_40px_rgba(52,211,153,0.5)]"
-                    : tutorialProgress > 0
+                className={`relative w-44 h-44 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${tutorialCompleted
+                  ? "bg-emerald-500/20 border-emerald-400 shadow-[0_0_40px_rgba(52,211,153,0.5)]"
+                  : tutorialProgress > 0
                     ? "bg-[#f0a25c]/15 border-[#f0a25c] shadow-[0_0_35px_rgba(240,162,92,0.4)]"
                     : "bg-[#10111c]/80 border-[#292b3b] shadow-2xl"
-                }`}
+                  }`}
               >
                 {/* Radial Progress Gauge */}
                 <svg className="absolute inset-0 w-full h-full transform -rotate-90 pointer-events-none">
@@ -1644,8 +1699,8 @@ export default function BoothPage() {
                       {isHovered && !isLocked && (
                         <div className="w-full bg-[#090a12] h-1.5 rounded-full overflow-hidden mb-2">
                           <div
-                            className="bg-[#f0a25c] h-full transition-all duration-75"
-                            style={{ width: `${dwellProgress}%` }}
+                            className="dwell-bar bg-[#f0a25c] h-full transition-all duration-75"
+                            style={{ width: "0%" }}
                           />
                         </div>
                       )}
@@ -1661,7 +1716,7 @@ export default function BoothPage() {
                         {isLocked
                           ? "✓ Terpilih!"
                           : isHovered
-                            ? `Mengunci (${dwellProgress}%)...`
+                            ? <span className="dwell-label">Mengunci (0%)...</span>
                             : "Pilih Paket"}
                       </div>
                     </div>
@@ -1751,8 +1806,8 @@ export default function BoothPage() {
                       {isHovered && !isLocked && (
                         <div className="w-full bg-[#090a12] h-1.5 rounded-full overflow-hidden mb-2">
                           <div
-                            className="bg-[#246cff] h-full transition-all duration-75"
-                            style={{ width: `${dwellProgress}%` }}
+                            className="dwell-bar bg-[#246cff] h-full transition-all duration-75"
+                            style={{ width: "0%" }}
                           />
                         </div>
                       )}
@@ -1768,7 +1823,7 @@ export default function BoothPage() {
                         {isLocked
                           ? "✓ Format Dipilih!"
                           : isHovered
-                            ? `Mengunci (${dwellProgress}%)...`
+                            ? <span className="dwell-label">Mengunci (0%)...</span>
                             : "Pilih Format"}
                       </div>
                     </div>
@@ -1905,8 +1960,8 @@ export default function BoothPage() {
                         {isHovered && !isLocked && (
                           <div className="w-full bg-[#090a12] h-1.5 rounded-full overflow-hidden mb-2">
                             <div
-                              className="bg-[#f0a25c] h-full transition-all duration-75"
-                              style={{ width: `${dwellProgress}%` }}
+                              className="dwell-bar bg-[#f0a25c] h-full transition-all duration-75"
+                              style={{ width: "0%" }}
                             />
                           </div>
                         )}
@@ -1922,7 +1977,7 @@ export default function BoothPage() {
                           {isLocked
                             ? "✓ Tema Dipilih!"
                             : isHovered
-                              ? `Mengunci (${dwellProgress}%)...`
+                              ? <span className="dwell-label">Mengunci (0%)...</span>
                               : "Pilih Tema"}
                         </div>
                       </div>
