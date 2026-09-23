@@ -189,6 +189,7 @@ export default function BoothPage() {
   const [qrisTimer, setQrisTimer] = useState(5);
   const [photoCountdown, setPhotoCountdown] = useState(3);
   const [qrTimer, setQrTimer] = useState(15);
+  const [xenonFlash, setXenonFlash] = useState(false);
   
   const [emailInputState, setEmailInputState] = useState("");
   const emailInputRef = useRef("");
@@ -782,7 +783,10 @@ export default function BoothPage() {
           if (prev <= 1) {
             clearInterval(interval);
 
-            // Execute Camera Snapshot Capture
+            // Execute Camera Snapshot Capture with Studio Xenon Flash
+            setXenonFlash(true);
+            setTimeout(() => setXenonFlash(false), 300);
+
             const snapshot = captureSnapshot();
             if (snapshot) {
               setCapturedPhotos((prevPhotos) => {
@@ -976,112 +980,175 @@ export default function BoothPage() {
         }`}
       />
 
-      {/* Dark Vignette Overlay */}
-      <div className="absolute inset-0 camera-overlay" />
+      {/* Studio Xenon Flash Screen Flare */}
+      <AnimatePresence>
+        {xenonFlash && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.28, ease: "easeOut" }}
+            className="absolute inset-0 bg-white z-[90] pointer-events-none"
+          />
+        )}
+      </AnimatePresence>
 
-      {/* ===== RELOCATED DEBUG STATUS BADGE (TOP RIGHT) ===== */}
-      <div className="absolute top-6 right-8 z-30 flex items-center gap-3 px-4 py-2 glass-dark rounded-full border border-white/10">
-        <div className={`w-2.5 h-2.5 rounded-full ${!ENABLE_PAYMENT ? "bg-emerald-400" : "bg-red-500"} animate-pulse`} />
-        <span className="text-white/90 text-xs font-bold tracking-wider uppercase">
-          AI Photobooth {IS_DEBUG ? "• [DEBUG ON]" : !ENABLE_PAYMENT ? `• Free Mode (${FREE_MODE_POSES} Poses)` : "• Ready"}
-        </span>
+      {/* Dark Studio Vignette Overlay */}
+      <div className="absolute inset-0 camera-vignette pointer-events-none" />
+
+      {/* Camera Viewfinder Optical Corner Brackets (Warm Mustard Accent) */}
+      <div className="camera-bracket-tl opacity-75 pointer-events-none z-30" />
+      <div className="camera-bracket-tr opacity-75 pointer-events-none z-30" />
+      <div className="camera-bracket-bl opacity-75 pointer-events-none z-30" />
+      <div className="camera-bracket-br opacity-75 pointer-events-none z-30" />
+
+      {/* Center Precision Framing Crosshair */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 pointer-events-none z-20 opacity-20">
+        <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-amber-400" />
+        <div className="absolute left-1/2 top-0 bottom-0 w-[1px] bg-amber-400" />
       </div>
 
-      {/* ===== GESTURE HAND CURSOR OVERLAY ===== */}
+      {/* ===== TOP TELEMETRY HUD BAR ===== */}
+      <header className="absolute top-6 inset-x-8 z-30 flex items-center justify-between pointer-events-none">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 px-3.5 py-1.5 glass-midnight rounded-lg border border-white/10 pointer-events-auto">
+            <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#f59e0b] animate-pulse" />
+            <span className="font-mono-tech text-[11px] font-bold text-zinc-300 tracking-widest uppercase">
+              SAAKA AIBOX // OPTICS
+            </span>
+          </div>
+
+          {lastDetectedGesture !== "none" && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="px-3 py-1 bg-amber-500/15 border border-amber-400/40 rounded-lg font-mono-tech text-[10px] text-amber-300 tracking-wider uppercase font-bold shadow-[0_0_12px_rgba(245,158,11,0.2)]"
+            >
+              GESTURE: {lastDetectedGesture.toUpperCase()}
+            </motion.div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 px-3.5 py-1.5 glass-midnight rounded-lg border border-white/10 pointer-events-auto">
+          <div className={`w-2 h-2 rounded-full ${!ENABLE_PAYMENT ? "bg-emerald-400" : "bg-blue-400"} animate-pulse`} />
+          <span className="font-mono-tech text-white/90 text-[11px] font-medium tracking-wider uppercase">
+            {IS_DEBUG ? "TELEMETRY [DEBUG]" : !ENABLE_PAYMENT ? `FREE MODE (${FREE_MODE_POSES} POSES)` : "KIOSK READY"}
+          </span>
+        </div>
+      </header>
+
+      {/* ===== SPATIAL RETICLE (WARM MUSTARD & DEEP BLUE ACCENTS) ===== */}
       {(step === "packages" || step === "select_photos") && (
         <div
           ref={cursorRef}
-          className="fixed pointer-events-none z-50 transform -translate-x-1/2 -translate-y-1/2 opacity-0"
+          className="fixed pointer-events-none z-50 transform -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-200"
           style={{ left: `50%`, top: `50%` }}
         >
-          <div className="relative flex items-center justify-center">
+          <div className="relative flex items-center justify-center w-20 h-20">
+            {/* Outer Rotating Dotted Camera Sight */}
+            <div className="absolute inset-0 rounded-full border border-dashed border-amber-400/50 animate-spin-slow" />
+
+            {/* Dwell Progress Radial Gauge */}
             {hoveredPkgId && (
-              <svg className="w-16 h-16 transform -rotate-90">
+              <svg className="absolute inset-0 w-20 h-20 transform -rotate-90">
                 <circle
-                  cx="32"
-                  cy="32"
-                  r="26"
-                  stroke="rgba(255,255,255,0.2)"
-                  strokeWidth="4"
+                  cx="40"
+                  cy="40"
+                  r="34"
+                  stroke="rgba(245, 158, 11, 0.2)"
+                  strokeWidth="3"
                   fill="none"
                 />
                 <circle
-                  cx="32"
-                  cy="32"
-                  r="26"
-                  stroke="#38bdf8"
-                  strokeWidth="4"
-                  strokeDasharray="163"
-                  strokeDashoffset={163 - (163 * dwellProgress) / 100}
+                  cx="40"
+                  cy="40"
+                  r="34"
+                  stroke="#f59e0b"
+                  strokeWidth="3.5"
+                  strokeDasharray="213"
+                  strokeDashoffset={213 - (213 * dwellProgress) / 100}
                   strokeLinecap="round"
                   fill="none"
-                  className="transition-all duration-75"
+                  className="transition-all duration-75 drop-shadow-[0_0_8px_#f59e0b]"
                 />
               </svg>
             )}
 
-            <div className="w-8 h-8 rounded-full bg-sky-400/80 border-2 border-white shadow-[0_0_20px_#0ea5e9] flex items-center justify-center animate-pulse">
-              <MousePointer2 className="w-4 h-4 text-dark fill-white" />
+            {/* Inner Precision Crosshair */}
+            <div className="w-8 h-8 rounded-full border border-amber-300/80 bg-obsidian-900/60 backdrop-blur-md flex items-center justify-center shadow-[0_0_15px_rgba(245,158,11,0.5)]">
+              <div className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#f59e0b] animate-ping" />
+              <div className="w-1.5 h-1.5 rounded-full bg-white absolute" />
             </div>
+
+            {/* Optical Target Ticks */}
+            <div className="absolute -top-1 w-1 h-2 bg-amber-400/80" />
+            <div className="absolute -bottom-1 w-1 h-2 bg-amber-400/80" />
+            <div className="absolute -left-1 h-1 w-2 bg-amber-400/80" />
+            <div className="absolute -right-1 h-1 w-2 bg-amber-400/80" />
           </div>
         </div>
       )}
 
-      {/* ===== IDLE STEP ===== */}
+      {/* ===== IDLE STEP (AMBIENT RADAR SONAR & WAVE GUIDE) ===== */}
       <AnimatePresence mode="wait">
         {step === "idle" && (
           <motion.div
             key="idle"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.4 } }}
-            className="absolute inset-0 flex flex-col items-center justify-between z-20 py-12 px-6 sm:px-12 text-center"
+            exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.35 } }}
+            className="absolute inset-0 flex flex-col items-center justify-between z-20 py-14 px-6 sm:px-12 text-center"
           >
-            <div className="h-10" />
+            <div className="h-6" />
 
+            {/* Central Branding with Ambient Mustard Sonar Ping */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
-              className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-10 max-w-4xl"
+              className="flex flex-col items-center justify-center gap-5 max-w-4xl relative"
             >
-              <div className="flex-shrink-0">
-                <Logo size="xl" variant="splash" animated priority />
+              <div className="relative mb-2">
+                <div className="absolute -inset-8 rounded-full bg-amber-500/10 animate-sonar-mustard pointer-events-none" />
+                <div className="absolute -inset-16 rounded-full bg-blue-500/10 animate-sonar-mustard [animation-delay:1.4s] pointer-events-none" />
+
+                <div className="relative">
+                  <Logo size="xl" variant="splash" animated priority />
+                </div>
               </div>
 
-              <div className="text-center md:text-left">
-                <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tight drop-shadow-xl mb-3">
-                  <span className="bg-gradient-to-r from-sky-400 via-blue-400 to-orange-400 bg-clip-text text-transparent">
-                    AI Box Photobooth
-                  </span>
+              <div>
+                <h1 className="text-4xl sm:text-6xl font-extrabold text-white tracking-tight drop-shadow-2xl font-display mb-2">
+                  AI Box Photobooth
                 </h1>
-                <p className="text-white/80 text-lg sm:text-xl font-light tracking-wide">
-                  Sentuhan masa depan tanpa menekan tombol
+                <p className="font-mono-tech text-amber-400 text-xs sm:text-sm tracking-[0.25em] uppercase font-semibold">
+                  Touchless Studio Photobox Experience
                 </p>
               </div>
             </motion.div>
 
+            {/* Bottom Wave Guide Floating Pod */}
             <motion.div
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
+              transition={{ delay: 0.2 }}
               className="relative"
             >
-              <div className="flex items-center gap-5 px-7 py-4.5 glass-dark rounded-full border border-sky-400/30 shadow-[0_10px_40px_rgba(14,165,233,0.25)]">
+              <div className="flex items-center gap-5 px-7 py-4 glass-midnight rounded-2xl border border-amber-400/30 shadow-[0_10px_40px_rgba(245,158,11,0.15)]">
                 <motion.div
-                  animate={{ rotate: [0, 20, -20, 20, 0] }}
-                  transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-500/40 flex-shrink-0"
+                  animate={{ rotate: [0, 18, -18, 18, 0] }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                  className="w-13 h-13 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/30 flex-shrink-0 text-obsidian-950 font-bold"
                 >
-                  <Hand className="w-8 h-8 sm:w-9 sm:h-9 text-white" />
+                  <Hand className="w-7 h-7 sm:w-8 sm:h-8" />
                 </motion.div>
 
                 <div className="text-left pr-3">
-                  <h3 className="text-white font-bold text-lg sm:text-2xl leading-tight">
+                  <h3 className="text-white font-display font-extrabold text-lg sm:text-xl leading-tight">
                     Lambaikan Tangan Ke Kamera
                   </h3>
-                  <p className="text-sky-200/80 text-xs sm:text-sm mt-0.5">
-                    Gerakkan tangan kekiri & kekanan untuk memulai
+                  <p className="font-mono-tech text-zinc-400 text-xs mt-0.5 tracking-wider uppercase">
+                    Wave Hand Left to Right to Start
                   </p>
                 </div>
               </div>
@@ -1090,14 +1157,14 @@ export default function BoothPage() {
                 <motion.div
                   initial={{ scale: 0.8, opacity: 0, y: 15 }}
                   animate={{ scale: 1, opacity: 1, y: 0 }}
-                  className="absolute -top-16 left-1/2 -translate-x-1/2 px-6 py-2.5 bg-emerald-500 text-white rounded-full font-bold text-sm shadow-xl flex items-center gap-2 border border-emerald-400 whitespace-nowrap"
+                  className="absolute -top-14 left-1/2 -translate-x-1/2 px-5 py-2 bg-emerald-500 text-white rounded-lg font-display font-extrabold text-xs shadow-xl flex items-center gap-2 border border-emerald-400 whitespace-nowrap"
                 >
                   <motion.div
                     animate={{ scale: [1, 1.5, 1] }}
                     transition={{ duration: 0.4, repeat: Infinity }}
-                    className="w-2.5 h-2.5 rounded-full bg-white"
+                    className="w-2 h-2 rounded-full bg-white"
                   />
-                  Lambaikan Tangan Terdeteksi! Menyiapkan...
+                  <span>Lambaian Terdeteksi! Menyiapkan...</span>
                 </motion.div>
               )}
             </motion.div>
@@ -1105,27 +1172,27 @@ export default function BoothPage() {
         )}
       </AnimatePresence>
 
-      {/* ===== PACKAGE SELECTION STEP ===== */}
+      {/* ===== PACKAGE SELECTION STEP (MIDNIGHT CARDS WITH MUSTARD ACCENTS) ===== */}
       <AnimatePresence>
         {step === "packages" && (
           <motion.div
             key="packages"
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.4 }}
+            exit={{ opacity: 0, scale: 0.97 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
             className="absolute inset-0 z-30 flex flex-col items-center justify-between p-6 sm:p-12 text-center"
           >
-            <div className="mt-4">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-sky-500/20 border border-sky-400/40 rounded-full text-sky-300 text-xs font-semibold uppercase tracking-wider mb-2">
-                <Sparkles className="w-3.5 h-3.5" />
-                Sistem Kursor Gestur Aktif
+            <div className="mt-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1 glass-midnight rounded-md text-amber-400 font-mono-tech text-xs tracking-widest uppercase mb-2.5 border border-amber-400/30">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                Touchless Selection System Active
               </div>
-              <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
-                Pilih Paket Photobooth Anda
+              <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight font-display">
+                Pilih Paket Photobooth
               </h2>
-              <p className="text-white/70 text-sm sm:text-base mt-1">
-                Arahkan jari/kursor atau klik pada kartu paket yang anda inginkan
+              <p className="font-mono-tech text-zinc-400 text-xs sm:text-sm mt-1 tracking-wider uppercase">
+                Arahkan Reticle Sensor atau Klik Kartu Pilihan
               </p>
             </div>
 
@@ -1137,38 +1204,36 @@ export default function BoothPage() {
                     key={pkg.id}
                     data-package-id={pkg.id}
                     onClick={() => handleSelectPackage(pkg)}
-                    whileHover={{ scale: 1.03, y: -4 }}
-                    whileTap={{ scale: 0.97 }}
-                    className={`relative rounded-3xl p-7 border backdrop-blur-xl bg-gradient-to-b ${
-                      pkg.gradient
-                    } cursor-pointer transition-all duration-200 text-left flex flex-col justify-between shadow-2xl ${
+                    whileHover={{ scale: 1.02, y: -4 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`relative rounded-2xl p-7 cursor-pointer transition-all duration-300 text-left flex flex-col justify-between ${
                       isHovered
-                        ? "ring-4 ring-sky-400 shadow-[0_0_40px_rgba(14,165,233,0.4)]"
-                        : ""
+                        ? "glass-midnight glow-mustard-border ring-1 ring-amber-400/60 shadow-[0_0_40px_rgba(245,158,11,0.3)]"
+                        : "glass-midnight hover:border-white/20 shadow-2xl"
                     }`}
                   >
                     {pkg.badge && (
-                      <span className="absolute -top-3 right-6 px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-extrabold text-xs rounded-full shadow-md">
+                      <span className="absolute -top-3 right-5 px-3 py-0.5 bg-gradient-to-r from-amber-500 to-amber-600 text-obsidian-950 font-display font-extrabold text-[10px] tracking-wider uppercase rounded-md shadow-md">
                         {pkg.badge}
                       </span>
                     )}
 
                     <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-2xl font-black text-white">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-2xl font-extrabold text-white font-display">
                           {pkg.name}
                         </h3>
-                        <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20">
-                          <Camera className={`w-5 h-5 ${pkg.accentColor}`} />
+                        <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
+                          <Camera className="w-5 h-5 text-amber-400" />
                         </div>
                       </div>
 
                       <div className="mb-5">
-                        <span className="text-3xl font-black text-white">
+                        <span className="text-3xl sm:text-4xl font-black text-white font-display">
                           {pkg.price}
                         </span>
-                        <span className="text-white/60 text-xs block mt-0.5 font-medium">
-                          {pkg.poses} Pose Foto Strip HD
+                        <span className="font-mono-tech text-zinc-400 text-xs block mt-1 tracking-wider uppercase">
+                          {pkg.poses} Pose Film Strip Studio
                         </span>
                       </div>
 
@@ -1176,9 +1241,9 @@ export default function BoothPage() {
                         {pkg.features.map((feat, idx) => (
                           <li
                             key={idx}
-                            className="flex items-center gap-2.5 text-xs text-white/90 font-medium"
+                            className="flex items-center gap-2.5 text-xs text-zinc-200 font-medium"
                           >
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                            <CheckCircle2 className="w-4 h-4 text-amber-400 flex-shrink-0" />
                             <span>{feat}</span>
                           </li>
                         ))}
@@ -1187,18 +1252,22 @@ export default function BoothPage() {
 
                     <div className="mt-auto">
                       {isHovered && (
-                        <div className="w-full bg-white/20 h-1.5 rounded-full overflow-hidden mb-3">
+                        <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden mb-3">
                           <div
-                            className="bg-sky-400 h-full transition-all duration-75"
+                            className="bg-amber-400 h-full transition-all duration-75 shadow-[0_0_8px_#f59e0b]"
                             style={{ width: `${dwellProgress}%` }}
                           />
                         </div>
                       )}
 
-                      <div className="w-full py-3 bg-white text-dark font-extrabold text-sm rounded-xl text-center shadow-lg group-hover:bg-sky-400 transition-colors">
-                        {isHovered
-                          ? `Menyeleksi (${dwellProgress}%)...`
-                          : "Pilih Paket Ini"}
+                      <div
+                        className={`w-full py-3 rounded-xl font-display font-extrabold text-xs tracking-wider uppercase text-center transition-all ${
+                          isHovered
+                            ? "bg-amber-400 text-obsidian-950 shadow-[0_0_20px_rgba(245,158,11,0.4)]"
+                            : "bg-white/10 text-white hover:bg-white/20 border border-white/10"
+                        }`}
+                      >
+                        {isHovered ? `Mengunci Pilihan (${dwellProgress}%)...` : "Pilih Paket"}
                       </div>
                     </div>
                   </motion.div>
@@ -1208,83 +1277,85 @@ export default function BoothPage() {
 
             <button
               onClick={() => setStep("idle")}
-              className="text-white/60 hover:text-white text-sm font-medium transition-colors flex items-center gap-2"
+              className="text-zinc-400 hover:text-white font-mono-tech text-xs tracking-wider uppercase transition-colors flex items-center gap-2 mb-2"
             >
               <ArrowLeft className="w-4 h-4" />
-              Kembali ke Layar Utama
+              Kembali ke Layar Standby
             </button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ===== CONFIRMATION STEP ===== */}
+      {/* ===== CONFIRMATION STEP (DUAL GESTURE DOCK) ===== */}
       <AnimatePresence>
         {step === "confirm" && selectedPkg && (
           <motion.div
             key="confirm"
-            initial={{ opacity: 0, scale: 0.85 }}
+            initial={{ opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
+            exit={{ opacity: 0, scale: 0.92 }}
             className="absolute inset-0 z-40 flex items-center justify-center p-4"
           >
-            <div className="glass-dark rounded-3xl p-8 sm:p-10 max-w-md w-full text-center border border-sky-400/40 shadow-[0_0_60px_rgba(14,165,233,0.35)]">
-              <div className="w-16 h-16 rounded-2xl bg-sky-500/20 text-sky-400 border border-sky-400/40 flex items-center justify-center mx-auto mb-4">
-                <Zap className="w-8 h-8" />
+            <div className="glass-midnight rounded-2xl p-8 max-w-lg w-full text-center border border-white/15 shadow-[0_0_60px_rgba(0,0,0,0.8)]">
+              <div className="w-14 h-14 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-400/30 flex items-center justify-center mx-auto mb-4 shadow-[0_0_20px_rgba(245,158,11,0.2)]">
+                <Zap className="w-7 h-7" />
               </div>
 
-              <h3 className="text-2xl font-black text-white mb-1">
-                Konfirmasi Pilihan Paket
+              <h3 className="text-2xl font-extrabold text-white font-display mb-1.5">
+                Konfirmasi Pesanan
               </h3>
-              <p className="text-white/70 text-sm mb-6">
-                Anda memilih <span className="font-bold text-sky-300">{selectedPkg.name}</span> seharga{" "}
+              <p className="text-zinc-300 text-sm mb-6 font-light">
+                Paket <span className="font-bold text-amber-400">{selectedPkg.name}</span> seharga{" "}
                 <span className="font-bold text-emerald-400">{selectedPkg.price}</span> ({selectedPkg.poses} Pose).
               </p>
 
-              <div className="bg-white/10 rounded-2xl p-4 border border-white/10 mb-6 text-left space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-400 flex items-center justify-center font-bold">
-                    <ThumbsUp className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="text-white font-bold text-sm block">
-                      👍 Thumbs Up (Jempol Ke Atas)
-                    </span>
-                    <span className="text-emerald-300 text-xs">
-                      Setuju & Lanjut Pembayaran
+              {/* Dual Visual Gesture Cards */}
+              <div className="grid grid-cols-2 gap-4 mb-6 text-left">
+                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col justify-between">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500 text-obsidian-950 flex items-center justify-center font-bold">
+                      <ThumbsUp className="w-4 h-4" />
+                    </div>
+                    <span className="text-emerald-300 font-display font-extrabold text-xs tracking-wider uppercase">
+                      Lanjut Bayar
                     </span>
                   </div>
+                  <span className="font-mono-tech text-[11px] text-zinc-300">
+                    👍 Jempol Ke Atas
+                  </span>
                 </div>
 
-                <div className="flex items-center gap-3 border-t border-white/10 pt-3">
-                  <div className="w-10 h-10 rounded-xl bg-red-500/20 border border-red-400/40 text-red-400 flex items-center justify-center font-bold">
-                    <ThumbsDown className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="text-white font-bold text-sm block">
-                      👎 Thumbs Down (Jempol Ke Bawah)
-                    </span>
-                    <span className="text-red-300 text-xs">
-                      Batal & Kembali Pilih Paket
+                <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 flex flex-col justify-between">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-7 h-7 rounded-lg bg-rose-500 text-white flex items-center justify-center font-bold">
+                      <ThumbsDown className="w-4 h-4" />
+                    </div>
+                    <span className="text-rose-300 font-display font-extrabold text-xs tracking-wider uppercase">
+                      Batal / Ganti
                     </span>
                   </div>
+                  <span className="font-mono-tech text-[11px] text-zinc-300">
+                    👎 Jempol Ke Bawah
+                  </span>
                 </div>
               </div>
 
-              <div className="flex gap-4">
+              {/* Action Bar */}
+              <div className="flex gap-3.5">
                 <button
                   onClick={handleConfirmNo}
-                  className="flex-1 py-3 bg-white/10 text-white hover:bg-white/20 rounded-xl font-bold text-sm transition-all border border-white/10 flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-white/10 hover:bg-white/15 text-zinc-300 rounded-xl font-display font-bold text-xs uppercase tracking-wider transition-all border border-white/10 flex items-center justify-center gap-2"
                 >
-                  <ThumbsDown className="w-4 h-4 text-red-400" />
-                  Batal (👎)
+                  <ThumbsDown className="w-4 h-4 text-rose-400" />
+                  Batal (Manual)
                 </button>
 
                 <button
                   onClick={handleConfirmYes}
-                  className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-obsidian-950 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(16,185,129,0.35)] flex items-center justify-center gap-2"
                 >
                   <ThumbsUp className="w-4 h-4" />
-                  Lanjut Bayar (👍)
+                  Lanjut Bayar (Manual)
                 </button>
               </div>
             </div>
@@ -1297,27 +1368,27 @@ export default function BoothPage() {
         {step === "qris" && selectedPkg && (
           <motion.div
             key="qris"
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
+            exit={{ opacity: 0, scale: 0.92 }}
             className="absolute inset-0 z-40 flex items-center justify-center p-4"
           >
-            <div className="glass-dark rounded-3xl p-8 sm:p-10 max-w-sm w-full text-center border border-emerald-400/40 shadow-[0_0_60px_rgba(16,185,129,0.35)]">
-              <div className="flex items-center justify-center gap-2 mb-3">
-                <QrCode className="w-6 h-6 text-emerald-400" />
-                <span className="text-white font-extrabold text-xl">
+            <div className="glass-midnight rounded-2xl p-8 max-w-sm w-full text-center border border-amber-400/30 shadow-[0_0_60px_rgba(0,0,0,0.8)]">
+              <div className="flex items-center justify-center gap-2 mb-1.5">
+                <QrCode className="w-5 h-5 text-amber-400" />
+                <span className="text-white font-display font-extrabold text-xl tracking-tight">
                   Pembayaran QRIS
                 </span>
               </div>
 
-              <p className="text-white/70 text-xs mb-4">
-                Scan QRIS dengan e-Wallet atau M-Banking Anda
+              <p className="font-mono-tech text-zinc-400 text-[11px] tracking-wider uppercase mb-4">
+                Scan QRIS via BCA, GoPay, OVO, Dana
               </p>
 
-              <div className="bg-white p-4 rounded-2xl shadow-xl border border-gray-200 inline-block mb-4">
+              <div className="bg-white p-4 rounded-xl shadow-2xl border border-white/20 inline-block mb-4 relative">
                 <svg
                   viewBox="0 0 200 200"
-                  className="w-44 h-44 mx-auto"
+                  className="w-40 h-40 mx-auto"
                   xmlns="http://www.w3.org/2000/svg"
                 >
                   <rect width="200" height="200" fill="white" />
@@ -1334,70 +1405,72 @@ export default function BoothPage() {
                     fill="black"
                   />
                   <path
-                    d="M80 20h15v20H80zM100 20h20v15h-20zM80 50h35v15H80zM20 80h20v25H20zM50 80h15v40H50zM80 80h40v15H80zM130 80h15v20h-15zM160 80h20v40h-20zM80 110h20v20H80zM110 110h35v15h-35zM80 140h15v40H80zM105 140h35v20h-35zM150 140h30v40h-30z"
-                    fill="#0f172a"
+                    d="M80 20h15v20H80zM100 20h20v15h-20zM80 50h35v15H80zM20 80h20v25H20z"
+                    fill="#070b14"
                   />
                 </svg>
-                <span className="text-dark font-extrabold text-xs block mt-2 tracking-widest uppercase">
+                <span className="text-obsidian-950 font-mono-tech font-extrabold text-[10px] block mt-1 tracking-widest uppercase">
                   NMID: ID102030405060
                 </span>
               </div>
 
-              <div className="bg-emerald-500/20 border border-emerald-400/40 rounded-xl py-2.5 px-4 mb-4">
-                <span className="text-emerald-300 text-xs block">Total Tagihan:</span>
-                <span className="text-white font-black text-2xl">
+              <div className="bg-amber-500/10 border border-amber-400/30 rounded-xl py-2 px-4 mb-4">
+                <span className="font-mono-tech text-amber-300 text-[10px] block uppercase tracking-wider">
+                  Total Tagihan:
+                </span>
+                <span className="text-white font-display font-extrabold text-2xl tracking-tight">
                   {selectedPkg.price}
                 </span>
               </div>
 
-              <div className="flex items-center justify-center gap-2 text-white/80 text-xs font-medium">
+              <div className="flex items-center justify-center gap-2 font-mono-tech text-zinc-400 text-xs">
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full"
+                  className="w-3.5 h-3.5 border-2 border-amber-400 border-t-transparent rounded-full"
                 />
-                <span>Memverifikasi Pembayaran Otomatis ({qrisTimer}s)...</span>
+                <span>Auto-Verifying Settlement ({qrisTimer}s)...</span>
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ===== PAID SUCCESS CELEBRATION STEP ===== */}
+      {/* ===== PAID SUCCESS STEP ===== */}
       <AnimatePresence>
         {step === "paid_success" && selectedPkg && (
           <motion.div
             key="paid_success"
-            initial={{ opacity: 0, scale: 0.8 }}
+            initial={{ opacity: 0, scale: 0.88 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             className="absolute inset-0 z-40 flex items-center justify-center p-4"
           >
-            <div className="glass-dark rounded-3xl p-10 max-w-sm w-full text-center border border-emerald-400 shadow-[0_0_80px_rgba(16,185,129,0.5)]">
+            <div className="glass-midnight rounded-2xl p-9 max-w-sm w-full text-center border border-emerald-400/40 shadow-[0_0_60px_rgba(16,185,129,0.3)]">
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: [0, 1.2, 1] }}
                 transition={{ duration: 0.5 }}
-                className="w-20 h-20 rounded-full bg-emerald-500 text-white flex items-center justify-center mx-auto mb-5 shadow-lg shadow-emerald-500/40"
+                className="w-18 h-18 rounded-xl bg-emerald-500 text-obsidian-950 flex items-center justify-center mx-auto mb-4 shadow-[0_0_30px_rgba(16,185,129,0.5)]"
               >
-                <Check className="w-12 h-12 stroke-[3]" />
+                <Check className="w-9 h-9 stroke-[3]" />
               </motion.div>
 
-              <h2 className="text-3xl font-black text-white mb-2">
-                Pembayaran Berhasil! 🎉
+              <h2 className="text-3xl font-extrabold text-white font-display mb-1">
+                Pembayaran Berhasil
               </h2>
-              <p className="text-emerald-200 text-sm font-medium mb-4">
-                Paket <span className="font-bold text-white">{selectedPkg.name}</span> aktif.
+              <p className="font-mono-tech text-emerald-300 text-xs tracking-wider uppercase mb-3">
+                Paket {selectedPkg.name} Aktif
               </p>
-              <p className="text-white/60 text-xs">
-                Menyiapkan kamera untuk sesi foto...
+              <p className="text-zinc-400 text-xs font-light">
+                Mempersiapkan lensa studio untuk sesi foto...
               </p>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ===== POSE READY STEP (CLEAN FLOATING TOP CARD, NO OVERLAY BLUR) ===== */}
+      {/* ===== POSE READY STEP (TOP MINIMAL FLOATING CAPSULE) ===== */}
       <AnimatePresence>
         {step === "pose_ready" && selectedPkg && (
           <motion.div
@@ -1405,40 +1478,38 @@ export default function BoothPage() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="absolute top-10 inset-x-0 z-40 flex flex-col items-center pointer-events-none px-4"
+            className="absolute top-8 inset-x-0 z-40 flex flex-col items-center pointer-events-none px-4"
           >
-            <div className="glass-dark rounded-full px-6 py-3 border border-sky-400/40 shadow-2xl flex items-center gap-4 pointer-events-auto">
+            <div className="glass-midnight rounded-xl px-5 py-3 border border-amber-400/40 shadow-2xl flex items-center gap-3.5 pointer-events-auto">
               <motion.div
                 animate={{ rotate: [0, -10, 10, -10, 0] }}
                 transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                className="w-10 h-10 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-sky-500/30 flex-shrink-0"
+                className="w-9 h-9 rounded-lg bg-gradient-to-tr from-amber-500 to-amber-600 text-obsidian-950 flex items-center justify-center shadow-md flex-shrink-0"
               >
-                <PeaceIcon className="w-6 h-6" />
+                <PeaceIcon className="w-5 h-5" />
               </motion.div>
 
               <div className="text-left pr-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-sky-300 font-bold text-xs uppercase tracking-wider">
-                    Pose {currentPoseIndex + 1} dari {selectedPkg.poses}
-                  </span>
-                </div>
-                <h3 className="text-white font-extrabold text-base sm:text-lg leading-tight">
-                  Tunjukkan Gestur Peace (✌️) Untuk Ambil Foto
+                <span className="font-mono-tech text-amber-300 font-bold text-[10px] uppercase tracking-wider block">
+                  Pose #{currentPoseIndex + 1} / {selectedPkg.poses}
+                </span>
+                <h3 className="text-white font-display font-extrabold text-sm sm:text-base leading-tight">
+                  Tunjukkan Gestur Peace (✌️) Untuk Mulai
                 </h3>
               </div>
 
               <button
                 onClick={() => setStep("countdown")}
-                className="px-4 py-2 bg-sky-500 hover:bg-sky-400 text-white text-xs font-extrabold rounded-full transition-all shadow-md ml-2"
+                className="px-3.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-obsidian-950 text-xs font-display font-extrabold rounded-lg transition-all shadow-[0_0_12px_rgba(245,158,11,0.4)] ml-1"
               >
-                Klik Foto (Manual)
+                Klik Foto
               </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ===== PHOTO COUNTDOWN STEP (CLEAN CRISP CAMERA FEED, NO HEAVY BLUR) ===== */}
+      {/* ===== PHOTO COUNTDOWN STEP (STUDIO SHUTTER DIAL) ===== */}
       <AnimatePresence>
         {step === "countdown" && selectedPkg && (
           <motion.div
@@ -1446,34 +1517,38 @@ export default function BoothPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/20 p-4 text-center pointer-events-none"
+            className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/25 p-4 text-center pointer-events-none"
           >
-            <div className="absolute top-8 px-6 py-2.5 glass-dark rounded-full border border-sky-400/40 text-sky-300 font-bold text-sm uppercase tracking-wider">
-              Pose {currentPoseIndex + 1} dari {selectedPkg.poses}
+            <div className="absolute top-8 px-4 py-1.5 glass-midnight rounded-md border border-amber-400/30 font-mono-tech text-amber-300 text-xs font-bold uppercase tracking-widest">
+              Pose #{currentPoseIndex + 1} / {selectedPkg.poses}
             </div>
 
-            <motion.div
-              key={photoCountdown}
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1.2, opacity: 1 }}
-              exit={{ scale: 2, opacity: 0 }}
-              transition={{ duration: 0.8 }}
-              className="text-8xl sm:text-9xl font-black text-white drop-shadow-[0_0_50px_#0ea5e9] mb-4 flex items-center justify-center gap-4"
-            >
-              {photoCountdown > 0 ? (
-                photoCountdown
-              ) : (
-                <>
-                  <Camera className="w-20 h-20 text-sky-400 animate-bounce" />
-                  <span>SMILE!</span>
-                </>
-              )}
-            </motion.div>
+            {/* Rotating Aperture Shutter Ring */}
+            <div className="relative flex items-center justify-center w-60 h-60 sm:w-72 sm:h-72 mb-4">
+              <div className="absolute inset-0 rounded-full border border-dashed border-amber-400/40 animate-spin-slow" />
+              <div className="absolute inset-5 rounded-full border border-white/10" />
 
-            <p className="text-white/90 text-lg sm:text-xl font-medium drop-shadow-md">
-              {photoCountdown > 0
-                ? "Bersiap untuk berpose!"
-                : "Mengambil foto HD..."}
+              <motion.div
+                key={photoCountdown}
+                initial={{ scale: 0.6, opacity: 0 }}
+                animate={{ scale: 1.15, opacity: 1 }}
+                exit={{ scale: 1.8, opacity: 0 }}
+                transition={{ duration: 0.75, ease: "easeOut" }}
+                className="text-8xl sm:text-9xl font-black text-white font-display drop-shadow-[0_0_50px_#f59e0b] flex items-center justify-center gap-3"
+              >
+                {photoCountdown > 0 ? (
+                  photoCountdown
+                ) : (
+                  <>
+                    <Camera className="w-18 h-18 text-amber-400 animate-bounce" />
+                    <span>SMILE!</span>
+                  </>
+                )}
+              </motion.div>
+            </div>
+
+            <p className="font-mono-tech text-amber-200 text-sm sm:text-base font-medium tracking-wider uppercase drop-shadow-md">
+              {photoCountdown > 0 ? "STRIKE A POSE!" : "CAPTURING STUDIO SHOT..."}
             </p>
           </motion.div>
         )}
@@ -1488,14 +1563,14 @@ export default function BoothPage() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="absolute inset-0 z-30 flex flex-col items-center justify-between p-6 sm:p-10 text-center bg-dark/95 overflow-y-auto"
+            className="absolute inset-0 z-30 flex flex-col items-center justify-between p-6 sm:p-10 text-center bg-obsidian-950/95 backdrop-blur-2xl overflow-y-auto"
           >
-            <div className="mt-2">
-              <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-                Pilih Foto Untuk Cetak Film Strip
+            <div className="mt-4">
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-display">
+                Kurasi Foto Film Strip
               </h2>
-              <p className="text-white/70 text-sm mt-1">
-                Gunakan kursor gestur atau klik foto yang ingin anda tampilkan di cetakan
+              <p className="font-mono-tech text-zinc-400 text-xs sm:text-sm mt-1 tracking-wider uppercase">
+                Gunakan Reticle Sensor atau Klik Foto untuk Menyeleksi
               </p>
             </div>
 
@@ -1512,26 +1587,26 @@ export default function BoothPage() {
                       key={idx}
                       data-photo-index={idx}
                       onClick={() => togglePhotoSelection(idx)}
-                      whileHover={{ scale: 1.04 }}
-                      whileTap={{ scale: 0.96 }}
-                      className={`relative rounded-2xl overflow-hidden aspect-[4/3] cursor-pointer border-2 transition-all ${
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`relative rounded-xl overflow-hidden aspect-[4/3] cursor-pointer border transition-all duration-200 ${
                         isSelected
-                          ? "border-sky-400 ring-4 ring-sky-400/50 shadow-lg shadow-sky-500/30"
-                          : "border-white/20 opacity-60 hover:opacity-100"
-                      } ${isHovered ? "ring-4 ring-amber-400 scale-105" : ""}`}
+                          ? "border-amber-400 ring-2 ring-amber-400/50 shadow-[0_0_25px_rgba(245,158,11,0.3)]"
+                          : "border-white/10 opacity-60 hover:opacity-100"
+                      } ${isHovered ? "ring-2 ring-amber-300 scale-[1.03]" : ""}`}
                     >
                       <img
                         src={photoUrl}
                         alt={`Pose ${idx + 1}`}
                         className="w-full h-full object-cover"
                       />
-                      <div className="absolute top-2 left-2 px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-md text-white font-bold text-xs">
-                        Pose #{idx + 1}
+                      <div className="absolute top-2 left-2 px-2 py-0.5 bg-obsidian-950/80 backdrop-blur-md rounded font-mono-tech text-white font-bold text-[9px] tracking-wider uppercase border border-white/10">
+                        SHOT #{idx + 1}
                       </div>
 
                       {isSelected && (
-                        <div className="absolute top-2 right-2 w-7 h-7 bg-sky-400 rounded-full flex items-center justify-center text-dark font-black shadow-md">
-                          <Check className="w-4 h-4 stroke-[3]" />
+                        <div className="absolute top-2 right-2 w-6 h-6 bg-amber-400 rounded-full flex items-center justify-center text-obsidian-950 font-black shadow-md">
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
                         </div>
                       )}
                     </motion.div>
@@ -1539,18 +1614,20 @@ export default function BoothPage() {
                 })}
               </div>
 
-              {/* Live Film Strip Preview Column */}
-              <div className="w-44 bg-slate-900/90 rounded-2xl p-3 border border-white/20 shadow-2xl flex flex-col items-center flex-shrink-0">
-                <div className="flex items-center gap-1.5 mb-2">
+              {/* Physical Film Strip Tray Preview */}
+              <div className="w-48 bg-obsidian-900/90 rounded-2xl p-3 border border-white/15 shadow-2xl flex flex-col items-center flex-shrink-0 relative">
+                <div className="flex items-center gap-2 mb-2.5">
                   <Logo size="sm" variant="rounded" animated={false} />
-                  <span className="text-white text-[10px] font-bold">AI BOX STRIP</span>
+                  <span className="font-mono-tech text-amber-400 text-[10px] font-bold tracking-wider uppercase">
+                    AI BOX STRIP
+                  </span>
                 </div>
 
                 <div className="space-y-2 w-full">
                   {selectedPhotoIndices.map((pIdx) => (
                     <div
                       key={pIdx}
-                      className="w-full aspect-[4/3] rounded-lg overflow-hidden border border-white/20 bg-slate-800"
+                      className="w-full aspect-[4/3] rounded-lg overflow-hidden border border-white/20 bg-obsidian-950 shadow-md"
                     >
                       <img
                         src={capturedPhotos[pIdx]}
@@ -1561,14 +1638,16 @@ export default function BoothPage() {
                   ))}
                 </div>
 
-                <span className="text-white/40 text-[9px] mt-3 font-semibold uppercase tracking-widest">
-                  Ready to Print
-                </span>
+                <div className="mt-3 pt-2 border-t border-white/10 w-full text-center">
+                  <span className="font-mono-tech text-zinc-400 text-[9px] font-semibold uppercase tracking-widest block">
+                    300 DPI // PRINT READY
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Action Bar with Hover-Click data-action-id attributes */}
-            <div className="flex gap-4">
+            {/* Action Bar */}
+            <div className="flex gap-3.5">
               <button
                 data-action-id="retake"
                 onClick={() => {
@@ -1576,14 +1655,14 @@ export default function BoothPage() {
                   setCurrentPoseIndex(0);
                   setStep("pose_ready");
                 }}
-                className={`px-6 py-3 rounded-xl font-bold text-sm transition-all border flex items-center gap-2 ${
+                className={`px-6 py-3 rounded-xl font-display font-bold text-xs uppercase tracking-wider transition-all border flex items-center gap-2 ${
                   hoveredPkgId === "action-retake"
-                    ? "bg-sky-500 text-white border-sky-400 ring-4 ring-sky-400/50 scale-105"
-                    : "bg-white/10 hover:bg-white/20 text-white border-white/10"
+                    ? "bg-amber-400 text-obsidian-950 border-amber-400 ring-2 ring-amber-400/50 scale-105 shadow-[0_0_15px_rgba(245,158,11,0.4)]"
+                    : "bg-white/10 hover:bg-white/15 text-white border-white/10"
                 }`}
               >
                 <RotateCcw className="w-4 h-4" />
-                Foto Ulang
+                Ambil Ulang (Retake)
               </button>
 
               <button
@@ -1593,14 +1672,14 @@ export default function BoothPage() {
                   setStep("print_confirm");
                 }}
                 disabled={selectedPhotoIndices.length === 0}
-                className={`px-8 py-3 rounded-xl font-black text-sm transition-all shadow-xl flex items-center gap-2 disabled:opacity-50 ${
+                className={`px-8 py-3 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider transition-all shadow-xl flex items-center gap-2 disabled:opacity-50 ${
                   hoveredPkgId === "action-print"
-                    ? "bg-emerald-500 text-white ring-4 ring-emerald-400/50 scale-105"
-                    : "bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-sky-500/30"
+                    ? "bg-emerald-400 text-obsidian-950 ring-2 ring-emerald-400/50 scale-105 shadow-[0_0_20px_rgba(16,185,129,0.5)]"
+                    : "bg-gradient-to-r from-amber-500 to-amber-600 text-obsidian-950 shadow-[0_0_20px_rgba(245,158,11,0.35)]"
                 }`}
               >
                 <Printer className="w-4 h-4" />
-                Cetak Film Strip ({selectedPhotoIndices.length} Foto)
+                Cetak Strip ({selectedPhotoIndices.length} Foto)
               </button>
             </div>
           </motion.div>
@@ -1612,60 +1691,61 @@ export default function BoothPage() {
         {step === "print_confirm" && (
           <motion.div
             key="print_confirm"
-            initial={{ opacity: 0, scale: 0.85 }}
+            initial={{ opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
+            exit={{ opacity: 0, scale: 0.92 }}
             className="absolute inset-0 z-40 flex items-center justify-center p-4"
           >
-            <div className="glass-dark rounded-3xl p-8 sm:p-10 max-w-md w-full text-center border border-sky-400/40 shadow-[0_0_60px_rgba(14,165,233,0.35)]">
-              <div className="w-16 h-16 rounded-2xl bg-sky-500/20 text-sky-400 border border-sky-400/40 flex items-center justify-center mx-auto mb-4">
-                <Printer className="w-8 h-8" />
+            <div className="glass-midnight rounded-2xl p-8 max-w-lg w-full text-center border border-white/15 shadow-[0_0_60px_rgba(0,0,0,0.8)]">
+              <div className="w-14 h-14 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-400/30 flex items-center justify-center mx-auto mb-4 shadow-[0_0_20px_rgba(245,158,11,0.2)]">
+                <Printer className="w-7 h-7" />
               </div>
 
-              <h3 className="text-2xl font-black text-white mb-1">
-                Konfirmasi Cetak Foto
+              <h3 className="text-2xl font-extrabold text-white font-display mb-1.5">
+                Konfirmasi Cetak Hardcopy
               </h3>
-              <p className="text-white/70 text-sm mb-6">
-                Cetak {selectedPhotoIndices.length} foto terpilih ke mesin printer sekarang?
+              <p className="text-zinc-300 text-sm mb-6 font-light">
+                Cetak {selectedPhotoIndices.length} pose terpilih ke mesin printer sekarang?
               </p>
 
-              <div className="bg-white/10 rounded-2xl p-4 border border-white/10 mb-6 text-left space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-400 flex items-center justify-center font-bold">
-                    <ThumbsUp className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="text-white font-bold text-sm block">
-                      👍 Thumbs Up (Setuju)
-                    </span>
-                    <span className="text-emerald-300 text-xs">
-                      Lanjut Input Email & Cetak
+              {/* Dual Visual Gesture Cards */}
+              <div className="grid grid-cols-2 gap-4 mb-6 text-left">
+                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col justify-between">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500 text-obsidian-950 flex items-center justify-center font-bold">
+                      <ThumbsUp className="w-4 h-4" />
+                    </div>
+                    <span className="text-emerald-300 font-display font-extrabold text-xs tracking-wider uppercase">
+                      Lanjut Cetak
                     </span>
                   </div>
+                  <span className="font-mono-tech text-[11px] text-zinc-300">
+                    👍 Jempol Ke Atas
+                  </span>
                 </div>
 
-                <div className="flex items-center gap-3 border-t border-white/10 pt-3">
-                  <div className="w-10 h-10 rounded-xl bg-red-500/20 border border-red-400/40 text-red-400 flex items-center justify-center font-bold">
-                    <ThumbsDown className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="text-white font-bold text-sm block">
-                      👎 Thumbs Down (Batal)
-                    </span>
-                    <span className="text-red-300 text-xs">
-                      Kembali Pilih Foto
+                <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 flex flex-col justify-between">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-7 h-7 rounded-lg bg-rose-500 text-white flex items-center justify-center font-bold">
+                      <ThumbsDown className="w-4 h-4" />
+                    </div>
+                    <span className="text-rose-300 font-display font-extrabold text-xs tracking-wider uppercase">
+                      Ganti Foto
                     </span>
                   </div>
+                  <span className="font-mono-tech text-[11px] text-zinc-300">
+                    👎 Jempol Ke Bawah
+                  </span>
                 </div>
               </div>
 
-              <div className="flex gap-4">
+              <div className="flex gap-3.5">
                 <button
                   onClick={() => setStep("select_photos")}
-                  className="flex-1 py-3 bg-white/10 text-white hover:bg-white/20 rounded-xl font-bold text-sm transition-all border border-white/10 flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-white/10 hover:bg-white/15 text-zinc-300 rounded-xl font-display font-bold text-xs uppercase tracking-wider transition-all border border-white/10 flex items-center justify-center gap-2"
                 >
-                  <ThumbsDown className="w-4 h-4 text-red-400" />
-                  Batal (👎)
+                  <ThumbsDown className="w-4 h-4 text-rose-400" />
+                  Batal (Manual)
                 </button>
 
                 <button
@@ -1673,10 +1753,10 @@ export default function BoothPage() {
                     handleStartDriveUpload();
                     setStep("email_input");
                   }}
-                  className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-obsidian-950 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(16,185,129,0.35)] flex items-center justify-center gap-2"
                 >
                   <ThumbsUp className="w-4 h-4" />
-                  Lanjut Cetak (👍)
+                  Lanjut Cetak (Manual)
                 </button>
               </div>
             </div>
@@ -1684,65 +1764,86 @@ export default function BoothPage() {
         )}
       </AnimatePresence>
 
-      {/* ===== EMAIL INPUT STEP (VOICE-TO-TEXT WITH FIST / OPEN PALM) ===== */}
+      {/* ===== EMAIL INPUT STEP ===== */}
       <AnimatePresence>
         {step === "email_input" && (
           <motion.div
             key="email_input"
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
+            exit={{ opacity: 0, scale: 0.92 }}
             className="absolute inset-0 z-40 flex items-center justify-center p-4"
           >
-            <div className="glass-dark rounded-3xl p-8 sm:p-10 max-w-md w-full text-center border border-purple-400/40 shadow-[0_0_60px_rgba(168,85,247,0.35)]">
-              <div className="w-16 h-16 rounded-2xl bg-purple-500/20 text-purple-400 border border-purple-400/40 flex items-center justify-center mx-auto mb-4">
-                <Mail className="w-8 h-8" />
+            <div className="glass-midnight rounded-2xl p-8 max-w-md w-full text-center border border-white/15 shadow-[0_0_60px_rgba(0,0,0,0.8)]">
+              <div className="w-14 h-14 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-400/30 flex items-center justify-center mx-auto mb-4 shadow-[0_0_20px_rgba(245,158,11,0.2)]">
+                <Mail className="w-7 h-7" />
               </div>
 
-              <h3 className="text-2xl font-black text-white mb-1">
-                Kirim Soft Copy Email
+              <h3 className="text-2xl font-extrabold text-white font-display mb-1.5">
+                Kirim Soft Copy HD
               </h3>
-              <p className="text-white/70 text-xs mb-6">
-                Bicara atau ketik alamat email anda untuk menerima file foto HD
+              <p className="font-mono-tech text-zinc-400 text-xs tracking-wider uppercase mb-5">
+                Ucapkan atau ketik alamat email Anda
               </p>
 
-              {/* Voice Control Guide */}
-              <div className="bg-white/10 rounded-2xl p-4 border border-white/10 mb-5 text-left space-y-2">
-                <div className="flex items-center justify-between text-xs text-white/90">
-                  <span className="font-bold flex items-center gap-2">
-                    <span className="text-lg">✊</span> Mengepal (Fist): Mulai Rekam
+              {/* Voice Gesture Guide */}
+              <div className="p-4 rounded-xl bg-obsidian-900/80 border border-white/10 mb-5 text-left space-y-2">
+                <div className="flex items-center justify-between text-xs text-zinc-200">
+                  <span className="font-semibold flex items-center gap-2">
+                    <span className="text-base">✊</span> Mengepal: Mulai Rekam
                   </span>
-                  <span className="text-purple-300 font-semibold">Voice-to-Text</span>
+                  <span className="font-mono-tech text-amber-400 text-[10px] font-bold">VOICE-INPUT</span>
                 </div>
-                <div className="flex items-center justify-between text-xs text-white/90 border-t border-white/10 pt-2">
-                  <span className="font-bold flex items-center gap-2">
-                    <span className="text-lg">🖐️</span> Terbuka (Open Palm): Stop Rekam
+                <div className="flex items-center justify-between text-xs text-zinc-300 border-t border-white/10 pt-2">
+                  <span className="font-semibold flex items-center gap-2">
+                    <span className="text-base">🖐️</span> Terbuka: Stop Rekam
                   </span>
                 </div>
+
+                {isRecordingVoice && (
+                  <div className="flex items-center justify-center gap-1.5 py-2.5 border-t border-white/10">
+                    {[0.2, 0.5, 0.8, 0.4, 0.9, 0.3, 0.7, 0.4].map((h, i) => (
+                      <motion.div
+                        key={i}
+                        animate={{ height: ["6px", "24px", "6px"] }}
+                        transition={{
+                          duration: 0.6 + h * 0.4,
+                          repeat: Infinity,
+                          ease: "easeInOut",
+                          delay: i * 0.08,
+                        }}
+                        className="w-1 bg-amber-400 rounded-full shadow-[0_0_6px_#f59e0b]"
+                      />
+                    ))}
+                    <span className="ml-3 font-mono-tech text-amber-400 text-xs font-bold animate-pulse">
+                      LISTENING...
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Email Text Input Field */}
-              <div className="relative mb-6">
+              <div className="relative mb-5">
                 <input
                   type="email"
                   value={emailInput}
                   onChange={(e) => setEmailInput(e.target.value)}
                   placeholder="contoh: user@gmail.com"
-                  className="w-full px-5 py-3.5 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-purple-400 text-sm font-medium"
+                  className="w-full px-4 py-3 bg-obsidian-900/90 border border-white/10 rounded-xl text-white placeholder:text-zinc-600 focus:outline-none focus:border-amber-400 font-mono-tech text-sm font-medium"
                 />
 
                 <button
                   onClick={isRecordingVoice ? stopRecordingVoice : startRecordingVoice}
-                  className={`absolute right-2 top-2 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                  className={`absolute right-2 top-2 px-3 py-1 rounded-lg text-xs font-mono-tech font-bold flex items-center gap-1.5 transition-all ${
                     isRecordingVoice
-                      ? "bg-red-500 text-white animate-pulse"
-                      : "bg-purple-500/40 hover:bg-purple-500/60 text-purple-200"
+                      ? "bg-rose-500 text-white animate-pulse"
+                      : "bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/30"
                   }`}
                 >
                   {isRecordingVoice ? (
                     <>
                       <MicOff className="w-3.5 h-3.5" />
-                      Merekam...
+                      Stop
                     </>
                   ) : (
                     <>
@@ -1754,20 +1855,20 @@ export default function BoothPage() {
               </div>
 
               {/* Submit Buttons */}
-              <div className="flex gap-4">
+              <div className="flex gap-3.5">
                 <button
                   onClick={() => handleSendEmailAndFinish("")}
-                  className="flex-1 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold text-xs transition-all border border-white/10"
+                  className="flex-1 py-3 bg-white/10 hover:bg-white/15 text-zinc-300 rounded-xl font-display font-bold text-xs uppercase tracking-wider transition-all border border-white/10"
                 >
                   Lewati Email
                 </button>
 
                 <button
                   onClick={() => handleSendEmailAndFinish(emailInput)}
-                  className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl font-bold text-xs transition-all shadow-lg shadow-purple-500/30 flex items-center justify-center gap-1.5"
+                  className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-obsidian-950 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(245,158,11,0.35)] flex items-center justify-center gap-2"
                 >
                   <ThumbsUp className="w-4 h-4" />
-                  Kirim & Cetak (👍)
+                  Kirim & Selesai (👍)
                 </button>
               </div>
             </div>
@@ -1775,82 +1876,84 @@ export default function BoothPage() {
         )}
       </AnimatePresence>
 
-      {/* ===== FINAL QR CODE DOWNLOAD STEP (5 SEC AUTO-RESET) ===== */}
+      {/* ===== FINAL QR CODE DOWNLOAD STEP ===== */}
       <AnimatePresence>
         {step === "qr_download" && (
           <motion.div
             key="qr_download"
-            initial={{ opacity: 0, scale: 0.85 }}
+            initial={{ opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
+            exit={{ opacity: 0, scale: 0.92 }}
             className="absolute inset-0 z-40 flex items-center justify-center p-4"
           >
-            <div className="glass-dark rounded-3xl p-8 sm:p-10 max-w-sm w-full text-center border border-sky-400/40 shadow-[0_0_80px_rgba(14,165,233,0.4)]">
-              <div className="w-16 h-16 rounded-2xl bg-sky-500/20 text-sky-400 border border-sky-400/40 flex items-center justify-center mx-auto mb-4">
-                <Download className="w-8 h-8" />
+            <div className="glass-midnight rounded-2xl p-8 max-w-sm w-full text-center border border-amber-400/30 shadow-[0_0_60px_rgba(0,0,0,0.8)]">
+              <div className="w-14 h-14 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-400/30 flex items-center justify-center mx-auto mb-4 shadow-[0_0_20px_rgba(245,158,11,0.2)]">
+                <Download className="w-7 h-7" />
               </div>
 
-              <h2 className="text-2xl sm:text-3xl font-black text-white mb-1">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-display mb-1">
                 Unduh Foto Digital HD
               </h2>
-              <p className="text-white/70 text-xs mb-5">
-                Scan QR Code di bawah untuk menyimpan file foto ke smartphone anda
+              <p className="font-mono-tech text-zinc-400 text-[11px] tracking-wider uppercase mb-4">
+                Scan QR Code di bawah dengan smartphone
               </p>
 
-              {/* QR Code & Drive Link */}
+              {/* Holographic QR Pod with Mustard Scanline */}
               {isUploading ? (
-                <div className="py-8 text-center space-y-3">
+                <div className="py-6 text-center space-y-3">
                   <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="w-12 h-12 border-4 border-sky-400 border-t-transparent rounded-full mx-auto"
+                    className="w-10 h-10 border-3 border-amber-400 border-t-transparent rounded-full mx-auto"
                   />
-                  <p className="text-xs text-sky-200 font-semibold animate-pulse">
-                    Memproses & Mengunggah ke Google Drive...
+                  <p className="font-mono-tech text-xs text-amber-400 font-bold uppercase tracking-wider animate-pulse">
+                    SYNCING GOOGLE DRIVE...
                   </p>
                 </div>
               ) : (
                 <>
-                  <div className="bg-white p-4 rounded-2xl shadow-xl border border-gray-200 inline-block mb-4">
+                  <div className="bg-white p-4 rounded-xl shadow-2xl border border-white/20 inline-block mb-3.5 relative overflow-hidden group">
+                    <div className="absolute left-0 right-0 h-0.5 bg-amber-400 shadow-[0_0_10px_#f59e0b] animate-scanline-mustard z-10 pointer-events-none" />
+
                     <QRCodeSVG
                       value={driveFolderUrl || (typeof window !== "undefined" ? window.location.href : "https://ai-box.id")}
-                      size={180}
+                      size={175}
                       className="mx-auto"
                     />
-                    <span className="text-dark font-extrabold text-[10px] block mt-2 tracking-wider uppercase">
-                      {driveFolderName || "Google Drive Folder"}
+                    <span className="text-obsidian-950 font-mono-tech font-extrabold text-[10px] block mt-1.5 tracking-widest uppercase">
+                      {driveFolderName || "Google Drive Public Folder"}
                     </span>
                   </div>
 
                   {driveFolderUrl && (
-                    <div className="mb-4">
+                    <div className="mb-3">
                       <a
                         href={driveFolderUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-block px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-bold text-xs shadow-md transition-all"
+                        className="inline-block px-3.5 py-1.5 bg-white/10 hover:bg-white/20 border border-white/15 text-amber-300 rounded-lg font-mono-tech font-bold text-[11px] tracking-wider uppercase transition-all"
                       >
-                        📂 Buka Google Drive Publik
+                        📂 Buka Google Drive Folder
                       </a>
                     </div>
                   )}
                 </>
               )}
 
-              <div className="bg-sky-500/20 border border-sky-400/40 rounded-xl py-2 px-4 mb-4">
-                <span className="text-sky-300 text-xs font-semibold">
+              <div className="bg-emerald-500/10 border border-emerald-400/30 rounded-lg py-2 px-3.5 mb-3.5">
+                <span className="font-mono-tech text-emerald-300 text-xs font-bold uppercase tracking-wider">
                   Foto Sedang Dicetak di Printer 🖨️
                 </span>
               </div>
 
               {/* Auto Reset Countdown */}
-              <div className="flex items-center justify-center gap-2 text-white/70 text-xs font-medium">
+              <div className="flex items-center justify-center gap-2 font-mono-tech text-zinc-400 text-xs">
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  className="w-3.5 h-3.5 border-2 border-sky-400 border-t-transparent rounded-full"
+                  className="w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full"
                 />
-                <span>Kembali ke Layar Utama dalam {qrTimer}s...</span>
+                <span>Reset Standby dalam {qrTimer}s...</span>
               </div>
             </div>
           </motion.div>
@@ -1864,26 +1967,28 @@ export default function BoothPage() {
         aria-label="Hidden admin button"
       />
 
-      {/* ===== ADMIN LOGOUT DIALOG ===== */}
+      {/* ===== ADMIN LOGOUT DIALOG (MIDNIGHT MODAL) ===== */}
       <AnimatePresence>
         {showAdminDialog && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
+            className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-gray-100 text-dark"
+              className="glass-midnight rounded-2xl p-7 max-w-sm w-full shadow-2xl border border-white/15 text-white"
             >
-              <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-3 mb-5">
                 <Logo size="sm" variant="rounded" animated={false} />
                 <div>
-                  <h3 className="font-bold text-dark text-lg">Admin Logout</h3>
-                  <p className="text-light-muted text-xs">
+                  <h3 className="font-display font-extrabold text-white text-lg">
+                    Admin Logout
+                  </h3>
+                  <p className="font-mono-tech text-zinc-400 text-xs uppercase tracking-wider">
                     Masukkan password admin
                   </p>
                 </div>
@@ -1895,7 +2000,7 @@ export default function BoothPage() {
                 onChange={(e) => setAdminPassword(e.target.value)}
                 placeholder="Password admin"
                 onKeyDown={(e) => e.key === "Enter" && handleAdminLogout()}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-dark placeholder:text-light-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all mb-4"
+                className="w-full px-3.5 py-2.5 bg-obsidian-900/90 border border-white/10 rounded-xl text-white placeholder:text-zinc-600 focus:outline-none focus:border-amber-400 font-mono-tech text-sm mb-3.5"
                 autoFocus
               />
 
@@ -1903,7 +2008,7 @@ export default function BoothPage() {
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="text-red-500 text-sm mb-3"
+                  className="text-rose-400 font-mono-tech text-xs mb-3"
                 >
                   {adminError}
                 </motion.p>
@@ -1916,13 +2021,13 @@ export default function BoothPage() {
                     setAdminPassword("");
                     setAdminError("");
                   }}
-                  className="flex-1 py-2.5 bg-gray-100 text-dark rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                  className="flex-1 py-2.5 bg-white/10 text-zinc-300 rounded-xl font-display font-bold text-xs uppercase tracking-wider hover:bg-white/15 transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   onClick={handleAdminLogout}
-                  className="flex-1 py-2.5 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-red-500/20"
+                  className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-display font-extrabold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-lg shadow-rose-500/30"
                 >
                   <LogOut className="w-4 h-4" />
                   Logout

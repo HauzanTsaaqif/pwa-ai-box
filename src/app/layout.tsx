@@ -1,17 +1,24 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Outfit, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
+const outfit = Outfit({
+  subsets: ["latin"],
+  weight: ["200", "300", "400", "500", "600", "700", "800", "900"],
+  variable: "--font-outfit",
+  display: "swap",
+});
+
+const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700", "800"],
-  variable: "--font-inter",
+  variable: "--font-sans",
   display: "swap",
 });
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
-  weight: ["400"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-mono",
   display: "swap",
 });
@@ -38,7 +45,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#0F172A",
+  themeColor: "#0A0F1D",
 };
 
 export default function RootLayout({
@@ -47,7 +54,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+    <html
+      lang="id"
+      className={`${outfit.variable} ${plusJakartaSans.variable} ${jetbrainsMono.variable}`}
+    >
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -56,7 +66,9 @@ export default function RootLayout({
           content="black-translucent"
         />
       </head>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased selection:bg-amber-400 selection:text-slate-950">
+        {children}
+      </body>
     </html>
   );
 }

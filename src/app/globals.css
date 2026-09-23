@@ -1,170 +1,57 @@
 @import "tailwindcss";
 
 /* =====================================================
-   COLOR SYSTEM — PWA AI BOX PHOTOBOOTH
-   Primary: #0EA5E9 (Sky Blue)
-   Secondary: #3B82F6 (Blue)
-   Accent: #F97316 (Orange)
-   Background: #F8FAFC (Light Gray)
-   Dark Overlay: rgba(15, 23, 42, 0.7)
+   ROYAL MIDNIGHT & MUSTARD ACCENT DESIGN SYSTEM
+   PWA AI BOX PHOTOBOOTH
    ===================================================== */
 
 @theme {
-  --color-primary: #0ea5e9;
-  --color-primary-light: #38bdf8;
-  --color-primary-dark: #0284c7;
-  --color-secondary: #3b82f6;
-  --color-secondary-light: #60a5fa;
-  --color-accent: #f97316;
-  --color-accent-light: #fb923c;
-  --color-accent-dark: #ea580c;
-  --color-surface: #f8fafc;
-  --color-card: #ffffff;
-  --color-dark: #0f172a;
-  --color-dark-card: #1e293b;
-  --color-dark-glass: rgba(15, 23, 42, 0.6);
+  /* Surfaces & Bases - Deep Midnight Blue */
+  --color-obsidian-950: #070b14;
+  --color-obsidian-900: #0c1222;
+  --color-obsidian-850: #111a31;
+  --color-obsidian-800: #172444;
+  --color-obsidian-700: #20315c;
+  --color-obsidian-border: rgba(255, 255, 255, 0.08);
+
+  /* Deep Blue Core */
+  --color-deep-blue: #1e3a8a;
+  --color-royal-blue: #2563eb;
+  --color-blue-light: #3b82f6;
+
+  /* Signature Warm Accent - Mustard Gold / Kuning-Oren */
+  --color-mustard: #f59e0b;
+  --color-mustard-light: #fbbf24;
+  --color-mustard-dark: #d97706;
+  --color-mustard-amber: #f97316;
+  --color-mustard-glow: rgba(245, 158, 11, 0.25);
+
+  /* Neutrals & Text */
+  --color-surface: #070b14;
+  --color-card: #0d1527;
+  --color-dark: #070b14;
   --color-light: #f8fafc;
   --color-light-muted: #94a3b8;
+  --color-zinc-technical: #64748b;
+
+  /* Semantic */
   --color-success: #10b981;
   --color-error: #ef4444;
   --color-warning: #f59e0b;
 }
 
 /* =====================================================
-   ANIMATION KEYFRAMES
+   KEYFRAME ANIMATIONS
    ===================================================== */
-@keyframes breathe {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.8;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 1;
-  }
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.02); }
 }
 
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-@keyframes pulse-glow {
-  0%,
-  100% {
-    box-shadow: 0 0 5px rgba(14, 165, 233, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 20px rgba(14, 165, 233, 0.6), 0 0 40px rgba(14, 165, 233, 0.3);
-  }
-}
-
-@keyframes slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slide-down {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes countdown-pop {
+@keyframes sonar-wave-mustard {
   0% {
-    transform: scale(0.5);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.2);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 0;
-  }
-}
-
-@keyframes wave-hand {
-  0%,
-  100% {
-    transform: rotate(0deg);
-  }
-  25% {
-    transform: rotate(15deg);
-  }
-  75% {
-    transform: rotate(-15deg);
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -200% center;
-  }
-  100% {
-    background-position: 200% center;
-  }
-}
-
-@keyframes gradient-flow {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-@keyframes particle-float {
-  0% {
-    transform: translateY(100vh) rotate(0deg);
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  90% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(-10vh) rotate(720deg);
-    opacity: 0;
-  }
-}
-
-@keyframes radar-ping {
-  0% {
-    transform: scale(0.8);
+    transform: scale(0.85);
     opacity: 0.8;
   }
   100% {
@@ -173,23 +60,39 @@
   }
 }
 
-@keyframes scan-beam {
+@keyframes xenon-flash {
   0% {
-    top: 5%;
+    opacity: 0.95;
+    background-color: #ffffff;
+  }
+  100% {
+    opacity: 0;
+    background-color: transparent;
+  }
+}
+
+@keyframes cyber-scanline-mustard {
+  0% {
+    top: 0%;
     opacity: 0.2;
   }
   50% {
-    top: 90%;
-    opacity: 0.8;
+    top: 92%;
+    opacity: 0.9;
   }
   100% {
-    top: 5%;
+    top: 0%;
     opacity: 0.2;
   }
 }
 
+@keyframes reticle-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 /* =====================================================
-   BASE STYLES (@layer base)
+   BASE STYLES
    ===================================================== */
 @layer base {
   * {
@@ -202,132 +105,155 @@
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background-color: #070b14;
+    color: #f8fafc;
   }
 
   body {
-    font-family: "Inter", system-ui, -apple-system, sans-serif;
-    background-color: var(--color-surface);
-    color: var(--color-dark);
+    font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+    background-color: #070b14;
+    color: #f8fafc;
     min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-outfit), var(--font-sans), sans-serif;
+    letter-spacing: -0.02em;
   }
 }
 
 /* =====================================================
-   UTILITY CLASSES (@layer utilities)
+   SPECULAR & GLASS SYSTEM
    ===================================================== */
 @layer utilities {
-  .animate-breathe {
-    animation: breathe 3s ease-in-out infinite;
+  .font-display {
+    font-family: var(--font-outfit), var(--font-sans), sans-serif;
   }
 
-  .animate-float {
-    animation: float 3s ease-in-out infinite;
+  .font-mono-tech {
+    font-family: var(--font-mono), monospace;
   }
 
-  .animate-pulse-glow {
-    animation: pulse-glow 2s ease-in-out infinite;
+  /* Specular Deep Midnight Glass */
+  .glass-midnight {
+    background: linear-gradient(
+      140deg,
+      rgba(255, 255, 255, 0.05) 0%,
+      rgba(255, 255, 255, 0.01) 100%
+    ), rgba(11, 17, 33, 0.85);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   }
 
-  .animate-slide-up {
-    animation: slide-up 0.5s ease-out;
-  }
-
-  .animate-slide-down {
-    animation: slide-down 0.5s ease-out;
-  }
-
-  .animate-fade-in {
-    animation: fade-in 0.3s ease-out;
-  }
-
-  .animate-countdown {
-    animation: countdown-pop 1s ease-out;
-  }
-
-  .animate-wave-hand {
-    animation: wave-hand 0.5s ease-in-out infinite;
-  }
-
-  .animate-radar-ping {
-    animation: radar-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
-  }
-
-  .animate-scan-beam {
-    animation: scan-beam 4s ease-in-out infinite;
-  }
-
-  /* =====================================================
-     GLASSMORPHISM & PHOTOBOOTH UI
-     ===================================================== */
-  .glass {
-    background: rgba(255, 255, 255, 0.1);
+  .glass-midnight-card {
+    background: linear-gradient(
+      160deg,
+      rgba(23, 36, 68, 0.85) 0%,
+      rgba(11, 17, 33, 0.95) 100%
+    );
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
   }
 
-  .glass-dark {
-    background: rgba(15, 23, 42, 0.65);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(56, 189, 248, 0.2);
+  .glow-mustard-border {
+    border-color: rgba(245, 158, 11, 0.5);
+    box-shadow: 0 0 25px rgba(245, 158, 11, 0.25), inset 0 0 12px rgba(245, 158, 11, 0.1);
   }
 
-  .glass-card {
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.6);
+  .glow-blue-border {
+    border-color: rgba(37, 99, 235, 0.4);
+    box-shadow: 0 0 25px rgba(37, 99, 235, 0.25), inset 0 0 12px rgba(37, 99, 235, 0.1);
   }
 
-  .photobooth-frame {
-    box-shadow: 0 0 50px rgba(14, 165, 233, 0.2), inset 0 0 30px rgba(14, 165, 233, 0.1);
+  .glow-mustard-text {
+    text-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
   }
 
-  /* =====================================================
-     SCROLLBAR
-     ===================================================== */
-  ::-webkit-scrollbar {
-    width: 6px;
+  /* Camera Optics Framing Brackets */
+  .camera-bracket-tl {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    width: 20px;
+    height: 20px;
+    border-top: 2px solid rgba(245, 158, 11, 0.6);
+    border-left: 2px solid rgba(245, 158, 11, 0.6);
   }
 
-  ::-webkit-scrollbar-track {
-    background: transparent;
+  .camera-bracket-tr {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 20px;
+    height: 20px;
+    border-top: 2px solid rgba(245, 158, 11, 0.6);
+    border-right: 2px solid rgba(245, 158, 11, 0.6);
   }
 
-  ::-webkit-scrollbar-thumb {
-    background: var(--color-light-muted);
-    border-radius: 3px;
+  .camera-bracket-bl {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    width: 20px;
+    height: 20px;
+    border-bottom: 2px solid rgba(245, 158, 11, 0.6);
+    border-left: 2px solid rgba(245, 158, 11, 0.6);
   }
 
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-primary);
+  .camera-bracket-br {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 20px;
+    height: 20px;
+    border-bottom: 2px solid rgba(245, 158, 11, 0.6);
+    border-right: 2px solid rgba(245, 158, 11, 0.6);
   }
 
-  /* =====================================================
-     CAMERA FEED
-     ===================================================== */
+  /* Animations */
+  .animate-sonar-mustard {
+    animation: sonar-wave-mustard 2.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
+  .animate-scanline-mustard {
+    animation: cyber-scanline-mustard 2.4s ease-in-out infinite;
+  }
+
+  .animate-spin-slow {
+    animation: reticle-spin 12s linear infinite;
+  }
+
+  .animate-xenon-flash {
+    animation: xenon-flash 0.35s ease-out forwards;
+  }
+
+  /* Camera feed styling */
   .camera-feed {
     object-fit: cover;
     width: 100%;
     height: 100%;
   }
 
-  .camera-overlay {
+  .camera-vignette {
     background: radial-gradient(
       circle at center,
-      rgba(15, 23, 42, 0.4) 0%,
-      rgba(15, 23, 42, 0.75) 75%,
-      rgba(15, 23, 42, 0.92) 100%
+      rgba(7, 11, 20, 0.1) 0%,
+      rgba(7, 11, 20, 0.65) 70%,
+      rgba(7, 11, 20, 0.95) 100%
     );
   }
 
-  /* =====================================================
-     QR CODE DISPLAY
-     ===================================================== */
-  .qr-container {
-    background: white;
-    padding: 16px;
-    border-radius: 16px;
+  /* Grid Background */
+  .bg-tech-grid {
+    background-image: radial-gradient(
+      rgba(255, 255, 255, 0.07) 1px,
+      transparent 1px
+    );
+    background-size: 28px 28px;
   }
 }
