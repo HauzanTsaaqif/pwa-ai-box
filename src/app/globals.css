@@ -1,49 +1,88 @@
 @import "tailwindcss";
 
 /* =====================================================
-   ROYAL MIDNIGHT & MUSTARD ACCENT DESIGN SYSTEM
-   PWA AI BOX PHOTOBOOTH
+   AIBOX EDITORIAL DESIGN SYSTEM (compro-inspired)
    ===================================================== */
 
+:root {
+  --background: #090a12;
+  --surface: #10111c;
+  --surface-light: #171927;
+  --foreground: #f7f7fb;
+  --muted: #9b9eaf;
+  --line: #292b3b;
+  --blue: #246cff;
+  --blue-hover: #4d87ff;
+  --orange: #ff7b00;
+  --orange-light: #f0a25c;
+}
+
 @theme {
-  /* Surfaces & Bases - Deep Midnight Blue */
-  --color-obsidian-950: #070b14;
-  --color-obsidian-900: #0c1222;
-  --color-obsidian-850: #111a31;
-  --color-obsidian-800: #172444;
-  --color-obsidian-700: #20315c;
-  --color-obsidian-border: rgba(255, 255, 255, 0.08);
+  /* Surfaces & Bases */
+  --color-background: #090a12;
+  --color-foreground: #f7f7fb;
+  --color-surface: #10111c;
+  --color-surface-light: #171927;
+  --color-muted: #9b9eaf;
+  --color-line: #292b3b;
 
-  /* Deep Blue Core */
-  --color-deep-blue: #1e3a8a;
-  --color-royal-blue: #2563eb;
-  --color-blue-light: #3b82f6;
+  /* Accent Colors */
+  --color-blue: #246cff;
+  --color-blue-hover: #4d87ff;
+  --color-orange: #ff7b00;
+  --color-orange-light: #f0a25c;
+  --color-mustard: #f0a25c;
+  --color-mustard-amber: #ff7b00;
 
-  /* Signature Warm Accent - Mustard Gold / Kuning-Oren */
-  --color-mustard: #f59e0b;
-  --color-mustard-light: #fbbf24;
-  --color-mustard-dark: #d97706;
-  --color-mustard-amber: #f97316;
-  --color-mustard-glow: rgba(245, 158, 11, 0.25);
+  /* Neutrals for components */
+  --color-obsidian-950: #090a12;
+  --color-obsidian-900: #10111c;
+  --color-obsidian-850: #141624;
+  --color-obsidian-800: #171927;
+  --color-obsidian-border: #292b3b;
 
-  /* Neutrals & Text */
-  --color-surface: #070b14;
-  --color-card: #0d1527;
-  --color-dark: #070b14;
-  --color-light: #f8fafc;
-  --color-light-muted: #94a3b8;
-  --color-zinc-technical: #64748b;
+  /* Fonts */
+  --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+  --font-display: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono-tech: var(--font-geist-mono), monospace;
+}
 
-  /* Semantic */
-  --color-success: #10b981;
-  --color-error: #ef4444;
-  --color-warning: #f59e0b;
+/* =====================================================
+   BASE STYLES
+   ===================================================== */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #090a12;
+    color: #f7f7fb;
+  }
+
+  body {
+    font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: #090a12;
+    color: #f7f7fb;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: -0.05em;
+  }
 }
 
 /* =====================================================
    KEYFRAME ANIMATIONS
    ===================================================== */
-
 @keyframes pulse-subtle {
   0%, 100% { opacity: 0.85; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.02); }
@@ -92,86 +131,53 @@
 }
 
 /* =====================================================
-   BASE STYLES
-   ===================================================== */
-@layer base {
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
-
-  html {
-    scroll-behavior: smooth;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    background-color: #070b14;
-    color: #f8fafc;
-  }
-
-  body {
-    font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
-    background-color: #070b14;
-    color: #f8fafc;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-outfit), var(--font-sans), sans-serif;
-    letter-spacing: -0.02em;
-  }
-}
-
-/* =====================================================
-   SPECULAR & GLASS SYSTEM
+   SURFACES & UTILITIES
    ===================================================== */
 @layer utilities {
   .font-display {
-    font-family: var(--font-outfit), var(--font-sans), sans-serif;
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
   }
 
   .font-mono-tech {
-    font-family: var(--font-mono), monospace;
+    font-family: var(--font-geist-mono), monospace;
   }
 
-  /* Specular Deep Midnight Glass */
+  /* Editorial Card Surface (from compro: #10111c with #292b3b border) */
   .glass-midnight {
-    background: linear-gradient(
-      140deg,
-      rgba(255, 255, 255, 0.05) 0%,
-      rgba(255, 255, 255, 0.01) 100%
-    ), rgba(11, 17, 33, 0.85);
-    backdrop-filter: blur(24px) saturate(160%);
-    -webkit-backdrop-filter: blur(24px) saturate(160%);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    background: #10111c;
+    border: 1px solid #292b3b;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
   }
 
   .glass-midnight-card {
-    background: linear-gradient(
-      160deg,
-      rgba(23, 36, 68, 0.85) 0%,
-      rgba(11, 17, 33, 0.95) 100%
-    );
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+    background: #171927;
+    border: 1px solid #292b3b;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  }
+
+  /* Compro-style Hero Atmosphere */
+  .hero-atmosphere {
+    background: linear-gradient(90deg, rgba(5, 8, 16, 0.92), rgba(14, 16, 30, 0.45)),
+      radial-gradient(circle at center, #2e3247 0%, #090a12 70%);
+  }
+
+  .hero-fade-bottom {
+    background: linear-gradient(transparent 75%, #090a12);
+  }
+
+  /* Glows & Highlights */
+  .glow-orange-text {
+    color: #f0a25c;
   }
 
   .glow-mustard-border {
-    border-color: rgba(245, 158, 11, 0.5);
-    box-shadow: 0 0 25px rgba(245, 158, 11, 0.25), inset 0 0 12px rgba(245, 158, 11, 0.1);
+    border-color: #ff7b00;
+    box-shadow: 0 0 20px rgba(255, 123, 0, 0.2);
   }
 
   .glow-blue-border {
-    border-color: rgba(37, 99, 235, 0.4);
-    box-shadow: 0 0 25px rgba(37, 99, 235, 0.25), inset 0 0 12px rgba(37, 99, 235, 0.1);
-  }
-
-  .glow-mustard-text {
-    text-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
+    border-color: #246cff;
+    box-shadow: 0 0 25px rgba(36, 108, 255, 0.2);
   }
 
   /* Camera Optics Framing Brackets */
@@ -181,8 +187,8 @@
     left: 20px;
     width: 20px;
     height: 20px;
-    border-top: 2px solid rgba(245, 158, 11, 0.6);
-    border-left: 2px solid rgba(245, 158, 11, 0.6);
+    border-top: 2px solid rgba(240, 162, 92, 0.7);
+    border-left: 2px solid rgba(240, 162, 92, 0.7);
   }
 
   .camera-bracket-tr {
@@ -191,8 +197,8 @@
     right: 20px;
     width: 20px;
     height: 20px;
-    border-top: 2px solid rgba(245, 158, 11, 0.6);
-    border-right: 2px solid rgba(245, 158, 11, 0.6);
+    border-top: 2px solid rgba(240, 162, 92, 0.7);
+    border-right: 2px solid rgba(240, 162, 92, 0.7);
   }
 
   .camera-bracket-bl {
@@ -201,8 +207,8 @@
     left: 20px;
     width: 20px;
     height: 20px;
-    border-bottom: 2px solid rgba(245, 158, 11, 0.6);
-    border-left: 2px solid rgba(245, 158, 11, 0.6);
+    border-bottom: 2px solid rgba(240, 162, 92, 0.7);
+    border-left: 2px solid rgba(240, 162, 92, 0.7);
   }
 
   .camera-bracket-br {
@@ -211,8 +217,8 @@
     right: 20px;
     width: 20px;
     height: 20px;
-    border-bottom: 2px solid rgba(245, 158, 11, 0.6);
-    border-right: 2px solid rgba(245, 158, 11, 0.6);
+    border-bottom: 2px solid rgba(240, 162, 92, 0.7);
+    border-right: 2px solid rgba(240, 162, 92, 0.7);
   }
 
   /* Animations */
@@ -242,18 +248,18 @@
   .camera-vignette {
     background: radial-gradient(
       circle at center,
-      rgba(7, 11, 20, 0.1) 0%,
-      rgba(7, 11, 20, 0.65) 70%,
-      rgba(7, 11, 20, 0.95) 100%
+      rgba(9, 10, 18, 0.1) 0%,
+      rgba(9, 10, 18, 0.7) 70%,
+      rgba(9, 10, 18, 0.95) 100%
     );
   }
 
-  /* Grid Background */
-  .bg-tech-grid {
+  /* Soft Ambient Noise / Grid */
+  .bg-subtle-pattern {
     background-image: radial-gradient(
-      rgba(255, 255, 255, 0.07) 1px,
+      rgba(255, 255, 255, 0.04) 1px,
       transparent 1px
     );
-    background-size: 28px 28px;
+    background-size: 24px 24px;
   }
 }

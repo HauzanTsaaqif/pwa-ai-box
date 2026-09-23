@@ -1,32 +1,23 @@
 import type { Metadata, Viewport } from "next";
-import { Outfit, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const outfit = Outfit({
+const geistSans = Geist({
   subsets: ["latin"],
-  weight: ["200", "300", "400", "500", "600", "700", "800", "900"],
-  variable: "--font-outfit",
+  variable: "--font-geist-sans",
   display: "swap",
 });
 
-const plusJakartaSans = Plus_Jakarta_Sans({
+const geistMono = Geist_Mono({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
-  variable: "--font-sans",
-  display: "swap",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-mono",
+  variable: "--font-geist-mono",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "AI Box Photobooth",
+  title: "AI Box — Capture Your Essence, Elevated by aibox",
   description:
-    "AI-Powered Photobooth PWA — Gesture-controlled photo experience with instant digital delivery",
+    "The world's premier AI-powered photobooth with gesture control — built for effortless, unforgettable moments.",
   manifest: "/manifest.json",
   icons: {
     icon: "/icons/icon-192.svg",
@@ -45,7 +36,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#0A0F1D",
+  themeColor: "#090a12",
 };
 
 export default function RootLayout({
@@ -56,7 +47,7 @@ export default function RootLayout({
   return (
     <html
       lang="id"
-      className={`${outfit.variable} ${plusJakartaSans.variable} ${jetbrainsMono.variable}`}
+      className={`${geistSans.variable} ${geistMono.variable}`}
     >
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
@@ -66,7 +57,7 @@ export default function RootLayout({
           content="black-translucent"
         />
       </head>
-      <body className="antialiased selection:bg-amber-400 selection:text-slate-950">
+      <body className="antialiased bg-[#090a12] text-[#f7f7fb] selection:bg-[#ff7b00] selection:text-white">
         {children}
       </body>
     </html>

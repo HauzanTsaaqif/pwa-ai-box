@@ -6,28 +6,28 @@ import { Home, Camera } from "lucide-react";
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen bg-[#070b14] bg-tech-grid flex items-center justify-center p-4 selection:bg-amber-400 selection:text-slate-950 font-sans">
+    <div className="min-h-screen bg-[#090a12] flex items-center justify-center p-4 selection:bg-[#ff7b00] selection:text-white font-sans">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass-midnight rounded-2xl p-8 sm:p-12 border border-white/10 text-center max-w-md w-full shadow-[0_0_50px_rgba(0,0,0,0.6)]"
+        className="bg-[#10111c] rounded-2xl p-8 sm:p-12 border border-[#292b3b] text-center max-w-md w-full shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
       >
         <motion.div
           animate={{ scale: [1, 1.05, 1] }}
           transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-          className="w-20 h-20 mx-auto mb-6 rounded-xl bg-amber-500/10 border border-amber-400/30 flex items-center justify-center"
+          className="w-16 h-16 mx-auto mb-6 rounded-xl bg-[#246cff]/10 border border-[#246cff]/25 flex items-center justify-center"
         >
-          <Camera className="w-10 h-10 text-amber-400" />
+          <Camera className="w-8 h-8 text-[#246cff]" />
         </motion.div>
 
-        <h1 className="text-6xl font-extrabold text-white mb-2 font-display">404</h1>
-        <p className="text-base text-slate-300 mb-8 font-normal">
+        <h1 className="text-5xl font-bold text-white mb-2 tracking-tight">404</h1>
+        <p className="text-sm text-[#9b9eaf] mb-8 font-normal">
           Halaman tidak ditemukan di kiosk AI Box.
         </p>
 
         <Link
           href="/"
-          className="inline-flex items-center gap-2 px-6 py-3 bg-amber-400 text-slate-950 rounded-xl font-display font-bold text-xs uppercase tracking-wider hover:bg-amber-300 transition-all shadow-[0_0_20px_rgba(245,158,11,0.25)]"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-[#246cff] text-white rounded-xl font-semibold text-xs uppercase tracking-wider hover:bg-[#4d87ff] transition-all shadow-[0_4px_16px_rgba(36,108,255,0.3)]"
         >
           <Home className="w-4 h-4" />
           <span>Kembali ke Beranda</span>
