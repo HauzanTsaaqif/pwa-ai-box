@@ -18,17 +18,9 @@ import Logo from "@/components/Logo";
 
 export default function LandingPage() {
   const [mounted, setMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<"strip" | "kiosk" | "frame">("strip");
-  const [simulatedGesture, setSimulatedGesture] = useState<"wave" | "peace" | "fist">("wave");
 
   useEffect(() => {
     setMounted(true);
-    const interval = setInterval(() => {
-      setSimulatedGesture((prev) =>
-        prev === "wave" ? "peace" : prev === "peace" ? "fist" : "wave"
-      );
-    }, 2800);
-    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -177,77 +169,187 @@ export default function LandingPage() {
           </div>
         </motion.div>
 
-        {/* Interactive Live Kiosk Viewfinder Simulator */}
+        {/* Live Kiosk Dual Demo: model_a.mp4 & model_b.mp4 side-by-side with ui-box.png overlay */}
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.5 }}
-          className="w-full max-w-md mt-16"
+          className="w-full max-w-6xl mt-16 text-left"
         >
-          <div className="bg-[#10111c] rounded-2xl p-6 border border-[#292b3b] shadow-[0_20px_50px_rgba(0,0,0,0.5)] text-left">
-            <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-[#292b3b]">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#f0a25c] animate-pulse" />
-                <span className="font-mono-tech text-xs font-semibold text-white tracking-wide uppercase">
-                  KIOSK OPTICS SIMULATOR
-                </span>
+          {/* Showcase Section Heading */}
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6 pb-4 border-b border-[#292b3b]">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#f0a25c]/10 border border-[#f0a25c]/25 text-[#f0a25c] text-[11px] font-mono-tech tracking-wider uppercase mb-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#f0a25c] animate-pulse" />
+                Dual Interactive PV Demonstration
               </div>
-              <span className="font-mono-tech text-[10px] text-[#9b9eaf] tracking-wider uppercase">
-                MEDIAPIPE 15 FPS
+              <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                Live Demonstration // Kiosk In Action
+              </h3>
+              <p className="text-xs sm:text-sm text-[#9b9eaf] mt-1 max-w-xl">
+                Pengalaman photobooth touchless mutakhir: deteksi gestur tangan presisi tinggi dan pemrosesan multi-pose instan dalam satu perangkat mandiri.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="font-mono-tech text-[10px] text-[#9b9eaf] uppercase tracking-wider bg-[#10111c] px-3 py-1.5 rounded-lg border border-[#292b3b] hidden sm:inline-flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]" />
+                60 FPS Engine
+              </span>
+              <span className="font-mono-tech text-[10px] text-[#f0a25c] uppercase tracking-wider bg-[#f0a25c]/10 px-3 py-1.5 rounded-lg border border-[#f0a25c]/25">
+                Touchless Photobox
               </span>
             </div>
+          </div>
 
-            <div className="relative aspect-[4/3] rounded-xl bg-[#090a12] border border-[#292b3b] overflow-hidden flex flex-col items-center justify-center p-6 text-center">
-              {/* Corner Framing Ticks in warm apricot */}
-              <div className="absolute top-3 left-3 w-3 h-3 border-t-2 border-l-2 border-[#f0a25c]/70" />
-              <div className="absolute top-3 right-3 w-3 h-3 border-t-2 border-r-2 border-[#f0a25c]/70" />
-              <div className="absolute bottom-3 left-3 w-3 h-3 border-b-2 border-l-2 border-[#f0a25c]/70" />
-              <div className="absolute bottom-3 right-3 w-3 h-3 border-b-2 border-r-2 border-[#f0a25c]/70" />
-
-              <div className="relative mb-3">
-                <div className="w-16 h-16 rounded-full border border-dashed border-[#f0a25c]/40 animate-spin-slow flex items-center justify-center">
-                  <div className="w-12 h-12 rounded-full bg-[#f0a25c]/10 flex items-center justify-center text-[#f0a25c]">
-                    {simulatedGesture === "wave" && <Hand className="w-6 h-6" />}
-                    {simulatedGesture === "peace" && <span className="text-xl font-bold">✌️</span>}
-                    {simulatedGesture === "fist" && <span className="text-xl font-bold">✊</span>}
+          {/* Dual Video Grid (Side-by-Side A & B) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-7">
+            {/* DEMO CARD A */}
+            <div className="group bg-[#10111c] rounded-2xl p-4 sm:p-5 border border-[#292b3b] hover:border-[#f0a25c]/40 transition-all duration-300 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col justify-between">
+              <div>
+                {/* Header */}
+                <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-[#292b3b]">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#f0a25c] animate-pulse" />
+                    <span className="font-mono-tech text-xs font-semibold text-white tracking-wide uppercase">
+                      LIVE DEMO A // GESTURE CAPTURE
+                    </span>
                   </div>
+                  <span className="font-mono-tech text-[10px] text-[#f0a25c] bg-[#f0a25c]/10 border border-[#f0a25c]/25 px-2 py-0.5 rounded tracking-wider uppercase">
+                    OPTICAL AI
+                  </span>
+                </div>
+
+                {/* Video container with realistic UI Box Overlay */}
+                <div className="relative aspect-video rounded-xl bg-[#090a12] border border-[#292b3b] overflow-hidden shadow-2xl">
+                  <video
+                    src="/model_a.mp4"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                  <img
+                    src="/ui-box.png"
+                    alt="AI Box Kiosk Interface A"
+                    className="absolute inset-0 w-full h-full object-cover pointer-events-none z-10"
+                  />
+                  {/* Subtle Corner HUD badge */}
+                  <div className="absolute top-2.5 right-2.5 z-20 pointer-events-none flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded border border-white/10 font-mono-tech text-[9px] text-white/90">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                    FEED 01
+                  </div>
+                </div>
+
+                {/* Selling Copy & Specs */}
+                <div className="mt-4">
+                  <h4 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                    <Hand className="w-4 h-4 text-[#f0a25c]" />
+                    Navigasi Gestur 100% Touchless
+                  </h4>
+                  <p className="text-xs text-[#9b9eaf] mt-1 leading-relaxed">
+                    Pengunjung memilih paket, format frame, dan tema photobox cukup dengan mengarahkan tangan ke udara tanpa menyentuh kaca display.
+                  </p>
                 </div>
               </div>
 
-              <div className="font-mono-tech text-xs text-[#f0a25c] font-semibold uppercase tracking-wider mb-1">
-                SENSOR: GESTUR {simulatedGesture.toUpperCase()}
+              {/* Badges / Micro Specs */}
+              <div className="mt-4 pt-3.5 border-t border-[#292b3b]/70 flex flex-wrap items-center gap-2 font-mono-tech text-[10px]">
+                <span className="px-2.5 py-1 rounded bg-[#090a12] border border-[#292b3b] text-[#cbd0e1]">
+                  MediaPipe Skeleton
+                </span>
+                <span className="px-2.5 py-1 rounded bg-[#090a12] border border-[#292b3b] text-[#cbd0e1]">
+                  Hover Ring Dwell 1.2s
+                </span>
+                <span className="px-2.5 py-1 rounded bg-[#f0a25c]/10 border border-[#f0a25c]/25 text-[#f0a25c]">
+                  Anti Smudge Screen
+                </span>
               </div>
-              <p className="text-[#9b9eaf] text-xs font-normal max-w-xs">
-                {simulatedGesture === "wave" && "Lambaian tangan terdeteksi: Membuka menu photobooth..."}
-                {simulatedGesture === "peace" && "Gestur Peace terdeteksi: Memicu hitung mundur foto..."}
-                {simulatedGesture === "fist" && "Gestur Kepalan terdeteksi: Mengaktifkan rekam email suara..."}
-              </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 mt-4">
-              {[
-                { id: "strip", label: "Film Strip", desc: "Multi-Pose HD" },
-                { id: "kiosk", label: "Gesture HUD", desc: "Optics AI" },
-                { id: "frame", label: "Branding", desc: "Custom Frame" },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`p-2.5 rounded-xl text-left border transition-all ${
-                    activeTab === tab.id
-                      ? "bg-[#171927] border-[#f0a25c]/50 text-white"
-                      : "bg-[#090a12]/60 border-[#292b3b] text-[#9b9eaf] hover:border-[#383b52]"
-                  }`}
-                >
-                  <span className="font-semibold text-xs text-white block">
-                    {tab.label}
+            {/* DEMO CARD B */}
+            <div className="group bg-[#10111c] rounded-2xl p-4 sm:p-5 border border-[#292b3b] hover:border-[#246cff]/40 transition-all duration-300 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col justify-between">
+              <div>
+                {/* Header */}
+                <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-[#292b3b]">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#246cff] animate-pulse" />
+                    <span className="font-mono-tech text-xs font-semibold text-white tracking-wide uppercase">
+                      LIVE DEMO B // MULTI-POSE SESSION
+                    </span>
+                  </div>
+                  <span className="font-mono-tech text-[10px] text-[#246cff] bg-[#246cff]/10 border border-[#246cff]/25 px-2 py-0.5 rounded tracking-wider uppercase">
+                    300 DPI RENDER
                   </span>
-                  <span className="font-mono-tech text-[9px] text-[#9b9eaf] uppercase">
-                    {tab.desc}
-                  </span>
-                </button>
-              ))}
+                </div>
+
+                {/* Video container with realistic UI Box Overlay */}
+                <div className="relative aspect-video rounded-xl bg-[#090a12] border border-[#292b3b] overflow-hidden shadow-2xl">
+                  <video
+                    src="/model_b.mp4"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                  <img
+                    src="/ui-box.png"
+                    alt="AI Box Kiosk Interface B"
+                    className="absolute inset-0 w-full h-full object-cover pointer-events-none z-10"
+                  />
+                  {/* Subtle Corner HUD badge */}
+                  <div className="absolute top-2.5 right-2.5 z-20 pointer-events-none flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded border border-white/10 font-mono-tech text-[9px] text-white/90">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                    FEED 02
+                  </div>
+                </div>
+
+                {/* Selling Copy & Specs */}
+                <div className="mt-4">
+                  <h4 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                    <Camera className="w-4 h-4 text-[#246cff]" />
+                    Siklus Foto Dinamis & Fast Preview
+                  </h4>
+                  <p className="text-xs text-[#9b9eaf] mt-1 leading-relaxed">
+                    Sistem pemotretan berurutan dengan audio-visual countdown, compositing frame otomatis 300 DPI, dan cetak studio cepat.
+                  </p>
+                </div>
+              </div>
+
+              {/* Badges / Micro Specs */}
+              <div className="mt-4 pt-3.5 border-t border-[#292b3b]/70 flex flex-wrap items-center gap-2 font-mono-tech text-[10px]">
+                <span className="px-2.5 py-1 rounded bg-[#090a12] border border-[#292b3b] text-[#cbd0e1]">
+                  Auto Flash Sync
+                </span>
+                <span className="px-2.5 py-1 rounded bg-[#090a12] border border-[#292b3b] text-[#cbd0e1]">
+                  Instant Print Spooler
+                </span>
+                <span className="px-2.5 py-1 rounded bg-[#246cff]/10 border border-[#246cff]/25 text-[#246cff]">
+                  QR Digital Download
+                </span>
+              </div>
             </div>
+          </div>
+
+          {/* Selling Banner / Kiosk Highlights */}
+          <div className="mt-6 bg-[#10111c]/60 rounded-xl p-4 border border-[#292b3b] flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-[#f0a25c]/15 border border-[#f0a25c]/25 flex items-center justify-center text-[#f0a25c]">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-white">Siap untuk Event, Mall & Retail Space</p>
+                <p className="text-[11px] text-[#9b9eaf]">Hardware plug & play mandiri dengan maintenance software nol.</p>
+              </div>
+            </div>
+            <Link
+              href="/booth"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-[#ff7b00] to-[#f0a25c] text-white text-xs font-semibold hover:shadow-[0_0_20px_rgba(255,123,0,0.4)] transition-all"
+            >
+              Coba Interactive Booth Sekarang
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
         </motion.div>
       </section>
@@ -436,7 +538,7 @@ export default function LandingPage() {
           </div>
 
           <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-[-0.04em] mb-4">
-            Hadirkan AI Box di Acara Spesial Anda
+            Hadirkan AI Box di Acara Spesial Anda!
           </h2>
           <p className="text-[#9b9eaf] text-sm sm:text-base max-w-lg mx-auto mb-8 leading-relaxed">
             Tersedia untuk rental Pernikahan, Ulang Tahun, Gathering Perusahaan, dan Brand Expo.

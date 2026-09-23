@@ -318,10 +318,13 @@ export function drawHandSkeleton(
     [17, 18], [18, 19], [19, 20],
   ];
 
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = "#0ea5e9";
-  ctx.shadowColor = "#38bdf8";
+  // Draw luminous bone connections in warm studio apricot/amber
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = "rgba(240, 162, 92, 0.75)";
+  ctx.shadowColor = "#f0a25c";
   ctx.shadowBlur = 8;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
 
   for (const [start, end] of connections) {
     const p1 = landmarks[start];
@@ -337,43 +340,60 @@ export function drawHandSkeleton(
     ctx.stroke();
   }
 
+  // Draw joint nodes and fingertips
   const tips = [4, 8, 12, 16, 20];
   landmarks.forEach((lm, idx) => {
     const x = (1 - lm.x) * width;
     const y = lm.y * height;
+    const isTip = tips.includes(idx);
 
     ctx.beginPath();
-    ctx.arc(x, y, tips.includes(idx) ? 7 : 4, 0, 2 * Math.PI);
+    ctx.arc(x, y, isTip ? 5.5 : 3.2, 0, 2 * Math.PI);
 
-    if (idx === 0) {
-      ctx.fillStyle = "#ef4444";
-    } else if (tips.includes(idx)) {
-      ctx.fillStyle = "#f97316";
+    if (idx === 8) {
+      // Index fingertip (active pointer)
+      ctx.fillStyle = "#ffffff";
+      ctx.shadowColor = "#f0a25c";
+      ctx.shadowBlur = 12;
+    } else if (isTip) {
+      ctx.fillStyle = "#f0a25c";
+      ctx.shadowColor = "#f0a25c";
+      ctx.shadowBlur = 6;
     } else {
-      ctx.fillStyle = "#10b981";
+      ctx.fillStyle = "rgba(247, 247, 251, 0.9)";
+      ctx.shadowBlur = 0;
     }
 
     ctx.fill();
     ctx.lineWidth = 1.5;
-    ctx.strokeStyle = "#ffffff";
+    ctx.strokeStyle = isTip ? "#f0a25c" : "rgba(41, 43, 59, 0.8)";
     ctx.stroke();
+
+    // Subtle outer halo on index finger pointer
+    if (idx === 8) {
+      ctx.beginPath();
+      ctx.arc(x, y, 10, 0, 2 * Math.PI);
+      ctx.strokeStyle = "rgba(240, 162, 92, 0.5)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
   });
 
-  // Render Debug Banner on TOP RIGHT so it does not block top-left status badges
+  // Optional debug banner
   if (gestureName) {
-    const boxWidth = 260;
-    const boxHeight = 36;
+    const boxWidth = 240;
+    const boxHeight = 32;
     const boxX = width - boxWidth - 16;
     const boxY = 16;
 
     ctx.shadowBlur = 0;
-    ctx.font = "bold 14px Inter, monospace";
-    ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+    ctx.font = "bold 12px monospace";
+    ctx.fillStyle = "rgba(9, 10, 18, 0.85)";
     ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
-    ctx.strokeStyle = "#0ea5e9";
+    ctx.strokeStyle = "#f0a25c";
     ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
-    ctx.fillStyle = "#38bdf8";
-    ctx.fillText(`[DEBUG] Gesture: ${gestureName}`, boxX + 12, boxY + 24);
+    ctx.fillStyle = "#f0a25c";
+    ctx.fillText(`GESTURE: ${gestureName}`, boxX + 12, boxY + 20);
   }
 
   ctx.restore();
