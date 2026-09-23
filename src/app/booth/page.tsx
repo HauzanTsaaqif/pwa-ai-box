@@ -5,15 +5,12 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Hand,
-  LogOut,
-  Lock,
   CheckCircle2,
   Sparkles,
   Camera,
   QrCode,
   ThumbsUp,
   ThumbsDown,
-  MousePointer2,
   Zap,
   ArrowLeft,
   Check,
@@ -23,6 +20,13 @@ import {
   Mail,
   RotateCcw,
   Download,
+  Layers,
+  Palette,
+  CreditCard,
+  Heart,
+  ChevronRight,
+  ShieldCheck,
+  Maximize2,
 } from "lucide-react";
 
 function PeaceIcon({ className = "w-6 h-6" }: { className?: string }) {
@@ -42,6 +46,7 @@ function PeaceIcon({ className = "w-6 h-6" }: { className?: string }) {
     </svg>
   );
 }
+
 import { isLoggedIn, getSession, clearSession, validateAdmin } from "@/lib/auth";
 import {
   MediaPipeManager,
@@ -61,29 +66,50 @@ const IS_DEBUG = process.env.NEXT_PUBLIC_DEBUG_MODE === "true";
 const ENABLE_PAYMENT = process.env.NEXT_PUBLIC_ENABLE_PAYMENT !== "false";
 const FREE_MODE_POSES = parseInt(process.env.NEXT_PUBLIC_FREE_MODE_POSES || "4", 10);
 
+// ===== 12-STEP EXACT USER FLOW =====
 export type BoothStep =
-  | "idle"
-  | "packages"
-  | "confirm"
-  | "qris"
-  | "paid_success"
-  | "pose_ready"
-  | "countdown"
-  | "select_photos"
-  | "print_confirm"
-  | "email_input"
-  | "qr_download";
+  | "idle"             // IDLE / HOME (with welcome guide)
+  | "select_package"   // Pilih Paket
+  | "select_format"    // Pilih Ukuran / Format
+  | "select_theme"     // Pilih Tema / Template
+  | "payment_qris"     // Bayar QRIS
+  | "pose_ready"       // Pose Ready (Standby before countdown)
+  | "countdown"        // Countdown & Capture
+  | "preview_retake"   // Preview / Retake
+  | "processing"       // Processing 300 DPI
+  | "print_session"    // Print confirmation
+  | "upload_digital"   // Upload Digital (Email + Drive)
+  | "qr_download"      // QR Download
+  | "thank_you";       // Thank You / Reset
 
-interface PackageItem {
+// ===== DATA DEFINITIONS =====
+export interface PackageItem {
   id: string;
   name: string;
   price: string;
   rawPrice: number;
   poses: number;
   badge?: string;
-  gradient: string;
-  accentColor: string;
+  description: string;
   features: string[];
+}
+
+export interface FormatItem {
+  id: string;
+  name: string;
+  ratio: string;
+  description: string;
+  badge?: string;
+}
+
+export interface ThemeItem {
+  id: string;
+  name: string;
+  bgHex: string;
+  textHex: string;
+  accentHex: string;
+  borderHex: string;
+  description: string;
 }
 
 const PACKAGES: PackageItem[] = [
@@ -93,9 +119,8 @@ const PACKAGES: PackageItem[] = [
     price: "Rp 25.000",
     rawPrice: 25000,
     poses: 3,
-    gradient: "from-sky-500/20 to-blue-600/20 border-sky-400/40",
-    accentColor: "text-sky-400",
-    features: ["3 Pose Film Strip", "Digital Download QR Code", "Lighting HD Presisi"],
+    description: "Sesi foto esensial untuk 1-2 orang",
+    features: ["3 Pose Foto HD", "Digital Download QR", "Lighting Studio Presisi"],
   },
   {
     id: "popular",
@@ -104,13 +129,8 @@ const PACKAGES: PackageItem[] = [
     rawPrice: 35000,
     poses: 4,
     badge: "Paling Laris",
-    gradient: "from-orange-500/20 to-amber-600/20 border-amber-400/50",
-    accentColor: "text-amber-400",
-    features: [
-      "4 Pose Film Strip",
-      "Pilihan AI Aesthetic Filter",
-      "Kirim Email HD + Download QR",
-    ],
+    description: "Favorit pengunjung dengan 4 pose lengkap",
+    features: ["4 Pose Foto HD", "Semua Tema Estetik", "Kirim Email + Download QR"],
   },
   {
     id: "vip",
@@ -118,14 +138,9 @@ const PACKAGES: PackageItem[] = [
     price: "Rp 50.000",
     rawPrice: 50000,
     poses: 6,
-    badge: "VIP Custom",
-    gradient: "from-purple-500/20 to-indigo-600/20 border-purple-400/50",
-    accentColor: "text-purple-400",
-    features: [
-      "6 Pose Multi-Strip",
-      "Semua Bingkai Kustom AI",
-      "Soft Copy HD Email + Print Ready",
-    ],
+    badge: "VIP Studio",
+    description: "Keseruan maksimal untuk grup & party",
+    features: ["6 Pose Multi-Frame", "Kustom Frame & Logo", "Softcopy HD + Print Siap"],
   },
 ];
 
@@ -135,14 +150,70 @@ const DEFAULT_FREE_PACKAGE: PackageItem = {
   price: "Gratis (Free Mode)",
   rawPrice: 0,
   poses: FREE_MODE_POSES,
-  gradient: "from-sky-500/20 to-blue-600/20 border-sky-400/40",
-  accentColor: "text-sky-400",
-  features: [
-    `${FREE_MODE_POSES} Pose Film Strip`,
-    "Digital Download QR Code",
-    "Sentuhan Gestur Tangan AI",
-  ],
+  description: "Mode Uji Coba / Sesi Bebas",
+  features: [`${FREE_MODE_POSES} Pose Foto HD`, "Digital Download QR Code", "Kontrol Gestur Tangan"],
 };
+
+const FORMATS: FormatItem[] = [
+  {
+    id: "strip_2x6",
+    name: "Classic Strip (2x6)",
+    ratio: "2:6 Vertikal",
+    description: "Format photobox klasik terfavorit, ideal untuk saku & bookmark.",
+    badge: "Terpopuler",
+  },
+  {
+    id: "postcard_4x6",
+    name: "Wide Postcard (4x6)",
+    ratio: "4:6 Landscape",
+    description: "Format kartu pos estetik dengan bidang foto luas untuk grup.",
+  },
+  {
+    id: "square_4x4",
+    name: "Square Grid (4x4)",
+    ratio: "1:1 Kotak",
+    description: "Format grid modern estetik untuk feed Instagram & album.",
+  },
+];
+
+const THEMES: ThemeItem[] = [
+  {
+    id: "noir",
+    name: "Minimalist Noir",
+    bgHex: "#090a12",
+    textHex: "#f7f7fb",
+    accentHex: "#9b9eaf",
+    borderHex: "#292b3b",
+    description: "Monokrom mewah & editorial kelas studio.",
+  },
+  {
+    id: "honey",
+    name: "Warm Honey Studio",
+    bgHex: "#14110f",
+    textHex: "#fff7ed",
+    accentHex: "#f0a25c",
+    borderHex: "#452e1f",
+    description: "Nuansa hangat kuning-mustard estetik & bersahabat.",
+  },
+  {
+    id: "midnight",
+    name: "Midnight Royal",
+    bgHex: "#0a0e1a",
+    textHex: "#ffffff",
+    accentHex: "#246cff",
+    borderHex: "#1e2c4f",
+    description: "Biru malam elegan dengan aksen royal blue.",
+  },
+  {
+    id: "pastel",
+    name: "Pastel Dream",
+    bgHex: "#1c1421",
+    textHex: "#fdf2f8",
+    accentHex: "#f472b6",
+    borderHex: "#3b2344",
+    description: "Sentuhan lembut manis untuk momen ceria.",
+  },
+];
 
 export default function BoothPage() {
   const router = useRouter();
@@ -161,36 +232,50 @@ export default function BoothPage() {
   const stepRef = useRef<BoothStep>("idle");
   const stepEntryTimeRef = useRef<number>(Date.now());
   const lastProcessedGestureRef = useRef<GestureType>("none");
-  const emailPendingTargetRef = useRef<string | null>(null);
+
+  // Selection States
+  const [selectedPkg, setSelectedPkg] = useState<PackageItem | null>(null);
+  const [selectedFormat, setSelectedFormat] = useState<FormatItem>(FORMATS[0]);
+  const [selectedTheme, setSelectedTheme] = useState<ThemeItem>(THEMES[0]);
+
+  // Selection Locking & Dwell Cooldown
+  const [lockedSelectionId, setLockedSelectionId] = useState<string | null>(null);
+  const dwellCooldownRef = useRef<number>(0);
+  const isTransitioningRef = useRef<boolean>(false);
+
   const setStep = useCallback((newStep: BoothStep) => {
     stepRef.current = newStep;
     stepEntryTimeRef.current = Date.now();
+    dwellCooldownRef.current = Date.now() + 1000; // 1s cooldown on every step change
+    setLockedSelectionId(null);
     setStepState(newStep);
   }, []);
   const step = stepState;
-  const [selectedPkg, setSelectedPkg] = useState<PackageItem | null>(null);
 
   // Photo Capture & Selection State
   const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
   const [currentPoseIndex, setCurrentPoseIndex] = useState(0);
-  const [selectedPhotoIndices, setSelectedPhotoIndices] = useState<number[]>([]);
 
   // Gesture & Cursor Tracking State
   const [lastDetectedGesture, setLastDetectedGesture] = useState<GestureType>("none");
   const [waveDetected, setWaveDetected] = useState(false);
   const cursorPosRef = useRef<{ x: number; y: number } | null>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const callbacksRef = useRef<any>({});
-  const [hoveredPkgId, setHoveredPkgId] = useState<string | null>(null);
+  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
   const [dwellProgress, setDwellProgress] = useState(0);
 
-  // Timers & Inputs State
+  // Timers & Dynamic Inputs
   const [qrisTimer, setQrisTimer] = useState(5);
   const [photoCountdown, setPhotoCountdown] = useState(3);
-  const [qrTimer, setQrTimer] = useState(15);
+  const [processProgress, setProcessProgress] = useState(0);
+  const [printCopies, setPrintCopies] = useState(1);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [qrTimer, setQrTimer] = useState(20);
+  const [thankYouTimer, setThankYouTimer] = useState(5);
   const [xenonFlash, setXenonFlash] = useState(false);
-  
+
+  // Email & Upload
   const [emailInputState, setEmailInputState] = useState("");
   const emailInputRef = useRef("");
   const setEmailInput = useCallback((val: string | ((prev: string) => string)) => {
@@ -206,22 +291,19 @@ export default function BoothPage() {
     }
   }, []);
   const emailInput = emailInputState;
-
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const isRecordingVoiceRef = useRef(false);
 
-  // Upload & Drive State
   const [isUploading, setIsUploading] = useState(false);
   const [driveFolderUrl, setDriveFolderUrl] = useState("");
   const [driveFolderName, setDriveFolderName] = useState("");
+  const photostripBase64Ref = useRef<string>("");
 
   // Admin Modal State
   const [showAdminDialog, setShowAdminDialog] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
   const [adminError, setAdminError] = useState("");
   const [hiddenTapCount, setHiddenTapCount] = useState(0);
-
-  const photostripBase64Ref = useRef<string>("");
 
   // ===== CAMERA SNAPSHOT HELPER =====
   const captureSnapshot = useCallback(() => {
@@ -247,10 +329,7 @@ export default function BoothPage() {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-    if (!SpeechRecognition) {
-      console.warn("Speech recognition not supported in this browser");
-      return;
-    }
+    if (!SpeechRecognition) return;
 
     try {
       const recognition = new SpeechRecognition();
@@ -279,8 +358,7 @@ export default function BoothPage() {
       recognition.start();
       setIsRecordingVoice(true);
       isRecordingVoiceRef.current = true;
-    } catch (err) {
-      console.warn("Failed to start speech recognition:", err);
+    } catch {
       setIsRecordingVoice(false);
       isRecordingVoiceRef.current = false;
     }
@@ -290,105 +368,176 @@ export default function BoothPage() {
     if (speechRecognitionRef.current && isRecordingVoiceRef.current) {
       try {
         speechRecognitionRef.current.stop();
-      } catch (err) {
-        console.warn("Failed to stop speech recognition:", err);
-      }
+      } catch {}
     }
     setIsRecordingVoice(false);
     isRecordingVoiceRef.current = false;
   }, []);
 
-  // ===== HANDLE UPLOAD TO GOOGLE DRIVE =====
-  const generateFilmStrip = async (photoUrls: string[]): Promise<string> => {
-    return new Promise((resolve) => {
-      if (photoUrls.length === 0) return resolve("");
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return resolve("");
+  // ===== CANVAS COMPOSITING (ADAPTS TO FORMAT & THEME) =====
+  const generateFilmStrip = useCallback(
+    async (photoUrls: string[]): Promise<string> => {
+      return new Promise((resolve) => {
+        if (photoUrls.length === 0) return resolve("");
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return resolve("");
 
-      const imgWidth = 600;
-      const imgHeight = 450;
-      const padding = 20;
-      const headerHeight = 80;
-      const footerHeight = 80;
+        const theme = selectedTheme || THEMES[0];
+        const format = selectedFormat || FORMATS[0];
 
-      canvas.width = imgWidth + padding * 2;
-      canvas.height = headerHeight + footerHeight + (imgHeight * photoUrls.length) + (padding * (photoUrls.length - 1));
+        let canvasWidth = 800;
+        let canvasHeight = 1800;
 
-      ctx.fillStyle = "#0f172a"; 
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 30px Arial";
-      ctx.textAlign = "center";
-      ctx.fillText("AI BOX PHOTOGRAPHIC", canvas.width / 2, 50);
-
-      // Fit-Crop (Object-Fit: Cover) helper for 2D Canvas
-      const drawImageCover = (
-        image: HTMLImageElement,
-        x: number,
-        y: number,
-        w: number,
-        h: number
-      ) => {
-        const imgRatio = image.width / image.height;
-        const targetRatio = w / h;
-        let sx = 0;
-        let sy = 0;
-        let sWidth = image.width;
-        let sHeight = image.height;
-
-        if (imgRatio > targetRatio) {
-          sWidth = image.height * targetRatio;
-          sx = (image.width - sWidth) / 2;
-        } else {
-          sHeight = image.width / targetRatio;
-          sy = (image.height - sHeight) / 2;
+        if (format.id === "postcard_4x6") {
+          canvasWidth = 1800;
+          canvasHeight = 1200;
+        } else if (format.id === "square_4x4") {
+          canvasWidth = 1400;
+          canvasHeight = 1400;
         }
 
-        ctx.drawImage(image, sx, sy, sWidth, sHeight, x, y, w, h);
-      };
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
 
-      let loaded = 0;
-      const imgs: HTMLImageElement[] = [];
+        // Background
+        ctx.fillStyle = theme.bgHex;
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-      photoUrls.forEach((url, i) => {
-        const img = new Image();
-        img.onload = () => {
-          loaded++;
-          imgs[i] = img;
-          if (loaded === photoUrls.length) {
-            imgs.forEach((loadedImg, idx) => {
-              const y = headerHeight + (imgHeight * idx) + (padding * idx);
-              drawImageCover(loadedImg, padding, y, imgWidth, imgHeight);
-            });
-            ctx.font = "italic 16px Arial";
-            ctx.fillStyle = "#94a3b8";
-            ctx.fillText("Capture your best moments", canvas.width / 2, canvas.height - 30);
-            resolve(canvas.toDataURL("image/jpeg", 0.9));
+        // Border frame
+        ctx.strokeStyle = theme.borderHex;
+        ctx.lineWidth = 14;
+        ctx.strokeRect(7, 7, canvasWidth - 14, canvasHeight - 14);
+
+        // Header Text
+        ctx.fillStyle = theme.textHex;
+        ctx.font = "bold 42px -apple-system, BlinkMacSystemFont, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("AI BOX PHOTOBOOTH", canvasWidth / 2, 70);
+
+        ctx.fillStyle = theme.accentHex;
+        ctx.font = "500 20px -apple-system, BlinkMacSystemFont, sans-serif";
+        ctx.fillText("CAPTURE YOUR ESSENCE // STUDIO EDITION", canvasWidth / 2, 105);
+
+        const drawImageCover = (
+          image: HTMLImageElement,
+          x: number,
+          y: number,
+          w: number,
+          h: number
+        ) => {
+          const imgRatio = image.width / image.height;
+          const targetRatio = w / h;
+          let sx = 0;
+          let sy = 0;
+          let sWidth = image.width;
+          let sHeight = image.height;
+
+          if (imgRatio > targetRatio) {
+            sWidth = image.height * targetRatio;
+            sx = (image.width - sWidth) / 2;
+          } else {
+            sHeight = image.width / targetRatio;
+            sy = (image.height - sHeight) / 2;
           }
-        };
-        img.src = url;
-      });
-    });
-  };
 
+          ctx.drawImage(image, sx, sy, sWidth, sHeight, x, y, w, h);
+        };
+
+        let loaded = 0;
+        const imgs: HTMLImageElement[] = [];
+
+        photoUrls.forEach((url, i) => {
+          const img = new Image();
+          img.onload = () => {
+            loaded++;
+            imgs[i] = img;
+            if (loaded === photoUrls.length) {
+              if (format.id === "strip_2x6") {
+                // Vertical Stack
+                const padX = 40;
+                const padY = 24;
+                const startY = 135;
+                const availableH = canvasHeight - startY - 90;
+                const singleH = (availableH - padY * (photoUrls.length - 1)) / photoUrls.length;
+                const singleW = canvasWidth - padX * 2;
+
+                imgs.forEach((loadedImg, idx) => {
+                  const y = startY + idx * (singleH + padY);
+                  drawImageCover(loadedImg, padX, y, singleW, singleH);
+                });
+              } else if (format.id === "postcard_4x6") {
+                // 2 Columns Grid
+                const cols = 2;
+                const rows = Math.ceil(photoUrls.length / 2);
+                const pad = 30;
+                const startY = 140;
+                const cellW = (canvasWidth - pad * 3) / cols;
+                const cellH = (canvasHeight - startY - 90 - pad * (rows - 1)) / rows;
+
+                imgs.forEach((loadedImg, idx) => {
+                  const col = idx % cols;
+                  const row = Math.floor(idx / cols);
+                  const x = pad + col * (cellW + pad);
+                  const y = startY + row * (cellH + pad);
+                  drawImageCover(loadedImg, x, y, cellW, cellH);
+                });
+              } else {
+                // Square Grid
+                const cols = 2;
+                const pad = 30;
+                const startY = 140;
+                const cellW = (canvasWidth - pad * 3) / cols;
+                const cellH = (canvasHeight - startY - 90 - pad) / 2;
+
+                imgs.forEach((loadedImg, idx) => {
+                  if (idx >= 4) return;
+                  const col = idx % cols;
+                  const row = Math.floor(idx / cols);
+                  const x = pad + col * (cellW + pad);
+                  const y = startY + row * (cellH + pad);
+                  drawImageCover(loadedImg, x, y, cellW, cellH);
+                });
+              }
+
+              // Footer
+              ctx.fillStyle = theme.accentHex;
+              ctx.font = "italic 22px -apple-system, BlinkMacSystemFont, sans-serif";
+              ctx.textAlign = "center";
+              ctx.fillText(
+                `Elevated by aibox • ${new Date().toLocaleDateString("id-ID")}`,
+                canvasWidth / 2,
+                canvasHeight - 35
+              );
+
+              resolve(canvas.toDataURL("image/jpeg", 0.94));
+            }
+          };
+          img.src = url;
+        });
+      });
+    },
+    [selectedFormat, selectedTheme]
+  );
+
+  // ===== GOOGLE DRIVE UPLOAD HANDLER =====
   const handleStartDriveUpload = useCallback(async () => {
     if (isUploading) return;
     setIsUploading(true);
 
-    let selectedUrls = selectedPhotoIndices.map(idx => capturedPhotos[idx]).filter(Boolean);
-    if (selectedUrls.length === 0) selectedUrls = [capturedPhotos[0]].filter(Boolean);
-    
-    let imagesToUpload = selectedUrls.map((url, i) => ({
+    let urls = capturedPhotos.filter(Boolean);
+    if (urls.length === 0) return;
+
+    let imagesToUpload = urls.map((url, i) => ({
       base64: url,
-      fileName: `pose_${i+1}.jpg`
+      fileName: `pose_${i + 1}.jpg`,
     }));
 
-    const gridBase64 = await generateFilmStrip(selectedUrls);
-    photostripBase64Ref.current = gridBase64;
-    if (gridBase64) {
-      imagesToUpload.push({ base64: gridBase64, fileName: "photostrip.jpg" });
+    if (photostripBase64Ref.current) {
+      imagesToUpload.push({
+        base64: photostripBase64Ref.current,
+        fileName: "photostrip.jpg",
+      });
     }
 
     try {
@@ -396,7 +545,7 @@ export default function BoothPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          customerId: "LAPLACE_ZERO",
+          customerId: "AIBOX_GUEST",
           images: imagesToUpload,
         }),
       });
@@ -411,41 +560,38 @@ export default function BoothPage() {
     } finally {
       setIsUploading(false);
     }
-  }, [capturedPhotos, selectedPhotoIndices, isUploading]);
+  }, [capturedPhotos, isUploading]);
 
-  // ===== HANDLE SEND EMAIL & FINISH TO QR DOWNLOAD =====
-  const handleSendEmailAndFinish = useCallback((targetEmailInput?: string) => {
-    setStep("qr_download");
-    const targetEmailToUse = targetEmailInput !== undefined ? targetEmailInput : emailInput;
-    emailPendingTargetRef.current = targetEmailToUse.trim();
-  }, [emailInput, setStep]);
+  // ===== EMAIL SEND HANDLER =====
+  const handleSendEmail = useCallback(
+    async (emailTarget?: string) => {
+      const target = (emailTarget !== undefined ? emailTarget : emailInput).trim();
+      if (!target || !driveFolderUrl) return;
 
-  // ===== EFFECT: SEND EMAIL WHEN UPLOAD FINISHES =====
-  useEffect(() => {
-    if (step === "qr_download" && !isUploading && driveFolderUrl && emailPendingTargetRef.current) {
-      const emailToSend = emailPendingTargetRef.current;
-      emailPendingTargetRef.current = null; // consume it so we only send once
+      let finalTarget = target;
+      if (!finalTarget.includes("@")) {
+        finalTarget += "@gmail.com";
+      }
 
-      if (emailToSend && (emailToSend.includes("@") || emailToSend.length > 3)) {
-        let finalEmailTarget = emailToSend;
-        if (!finalEmailTarget.includes("@")) {
-          finalEmailTarget += "@gmail.com";
-        }
-        fetch("/api/email/send", {
+      try {
+        await fetch("/api/email/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            toEmail: finalEmailTarget,
-            userName: "LAPLACE_ZERO",
+            toEmail: finalTarget,
+            userName: "Sahabat AI Box",
             publicPhotoUrl: driveFolderUrl,
             folderUrl: driveFolderUrl,
             folderName: driveFolderName || "AIBox_Photos",
             imageBase64: photostripBase64Ref.current,
           }),
-        }).catch((err) => console.error("Failed to send email:", err));
+        });
+      } catch (err) {
+        console.error("Failed to send email:", err);
       }
-    }
-  }, [step, isUploading, driveFolderUrl, driveFolderName]);
+    },
+    [emailInput, driveFolderUrl, driveFolderName]
+  );
 
   // ===== INIT CAMERA & MEDIAPIPE =====
   useEffect(() => {
@@ -502,7 +648,7 @@ export default function BoothPage() {
         mp.onGesture((result: GestureResult) => {
           setLastDetectedGesture(result.gesture);
 
-          // 1. Draw Debug Skeleton Overlay if IS_DEBUG is enabled
+          // Draw Debug Skeleton Overlay if enabled
           if (IS_DEBUG && canvasRef.current) {
             const ctx = canvasRef.current.getContext("2d");
             if (ctx) {
@@ -516,7 +662,7 @@ export default function BoothPage() {
             }
           }
 
-          // 2. Track Hand Gesture Cursor Position (Index Finger Tip landmark 8)
+          // Track Hand Gesture Cursor Position (Index Finger Tip #8)
           if (result.landmarks && result.landmarks[8]) {
             const indexTip = result.landmarks[8];
             const px = (1 - indexTip.x) * 100;
@@ -534,16 +680,17 @@ export default function BoothPage() {
             }
           }
 
-          const canTriggerAction = (Date.now() - stepEntryTimeRef.current) > 1000;
-          
+          const canTriggerAction = Date.now() - stepEntryTimeRef.current > 1000;
+
           if (result.gesture === "none") {
             lastProcessedGestureRef.current = "none";
           }
-          
-          const isNewGesture = result.gesture !== "none" && result.gesture !== lastProcessedGestureRef.current;
+
+          const isNewGesture =
+            result.gesture !== "none" && result.gesture !== lastProcessedGestureRef.current;
           const canTriggerNewGestureAction = canTriggerAction && isNewGesture;
 
-          // 3. IDLE STEP: Active Wave Motion Trigger
+          // 1. IDLE STEP: Wave Hand to Start
           if (stepRef.current === "idle" && result.gesture === "wave" && canTriggerNewGestureAction) {
             setWaveDetected(true);
             if (!waveTimerRef.current) {
@@ -552,68 +699,36 @@ export default function BoothPage() {
                 waveTimerRef.current = null;
                 setWaveDetected(false);
                 lastProcessedGestureRef.current = result.gesture;
-                if (!ENABLE_PAYMENT) {
-                  // Skip payment flow completely! Auto-select free package with FREE_MODE_POSES
-                  callbacksRef.current.setSelectedPkg?.(DEFAULT_FREE_PACKAGE);
-                  callbacksRef.current.setCapturedPhotos?.([]);
-                  callbacksRef.current.setCurrentPoseIndex?.(0);
-                  callbacksRef.current.setStep?.("pose_ready");
-                } else {
-                  callbacksRef.current.setStep?.("packages");
-                }
-              }, 1000);
+                callbacksRef.current.setStep?.("select_package");
+              }, 900);
             }
           }
 
-          // 4. POSE READY STEP: Peace Gesture ✌️ Trigger Photo Countdown
+          // 2. POSE READY STEP: Peace Gesture ✌️ Trigger Photo Countdown
           if (stepRef.current === "pose_ready" && result.gesture === "peace" && canTriggerNewGestureAction) {
             lastProcessedGestureRef.current = result.gesture;
             callbacksRef.current.setStep?.("countdown");
           }
 
-          // 5. CONFIRM & PRINT CONFIRM STEP: Thumbs Up 👍 & Thumbs Down 👎
-          if (stepRef.current === "confirm" && canTriggerNewGestureAction) {
+          // 3. PREVIEW / RETAKE STEP: Thumbs Up 👍 (Continue) / Thumbs Down 👎 (Retake)
+          if (stepRef.current === "preview_retake" && canTriggerNewGestureAction) {
             if (result.gesture === "thumbs_up") {
               lastProcessedGestureRef.current = result.gesture;
-              callbacksRef.current.handleConfirmYes?.();
+              callbacksRef.current.handleConfirmPreview?.();
             } else if (result.gesture === "thumbs_down") {
               lastProcessedGestureRef.current = result.gesture;
-              callbacksRef.current.handleConfirmNo?.();
+              callbacksRef.current.handleRetake?.();
             }
           }
 
-          if (stepRef.current === "print_confirm" && canTriggerNewGestureAction) {
-            if (result.gesture === "thumbs_up") {
-              lastProcessedGestureRef.current = result.gesture;
-              callbacksRef.current.handleStartDriveUpload?.();
-              callbacksRef.current.setStep?.("email_input");
-            } else if (result.gesture === "thumbs_down") {
-              lastProcessedGestureRef.current = result.gesture;
-              callbacksRef.current.setStep?.("select_photos");
-            }
-          }
-
-          // 6. EMAIL INPUT STEP: Fist ✊ (Start Voice) & Open Palm 🖐️ (Stop Voice)
-          if (stepRef.current === "email_input") {
-            const canSubmitEmailGesture = (Date.now() - stepEntryTimeRef.current) > 2000;
+          // 4. UPLOAD DIGITAL STEP: Voice input with Fist ✊ and Open Palm 🖐️
+          if (stepRef.current === "upload_digital") {
             if (result.gesture === "fist" && canTriggerNewGestureAction) {
               lastProcessedGestureRef.current = result.gesture;
               callbacksRef.current.startRecordingVoice?.();
             } else if (result.gesture === "open_palm" && canTriggerNewGestureAction) {
               lastProcessedGestureRef.current = result.gesture;
               callbacksRef.current.stopRecordingVoice?.();
-            } else if (result.gesture === "thumbs_up" && canSubmitEmailGesture && isNewGesture) {
-              lastProcessedGestureRef.current = result.gesture;
-              callbacksRef.current.handleSendEmailAndFinish?.(emailInputRef.current);
-            }
-          }
-
-          // 7. SCROLL SUPPORT FOR SELECT_PHOTOS (Allow continuous firing so we check canTriggerAction instead of canTriggerNewGestureAction)
-          if (stepRef.current === "select_photos" && canTriggerAction) {
-            if (result.gesture === "fist") {
-              callbacksRef.current.scrollContainerRef?.current?.scrollBy({ top: 30, behavior: "auto" });
-            } else if (result.gesture === "open_palm") {
-              callbacksRef.current.scrollContainerRef?.current?.scrollBy({ top: -30, behavior: "auto" });
             }
           }
         });
@@ -630,20 +745,26 @@ export default function BoothPage() {
     return () => {
       cancelled = true;
       if (waveTimerRef.current) clearTimeout(waveTimerRef.current);
-      if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current);
+      if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
       cleanup();
     };
   }, [router]);
 
-  // ===== DWELL HOVER CLICK SIMULATION FOR PACKAGES, PHOTO SELECTION, & ACTIONS =====
+  // ===== ROBUST DWELL HOVER CLICK WITH COOLDOWN & CONFIRMATION DELAY =====
   useEffect(() => {
     const hoverInterval = setInterval(() => {
       const currentStep = stepRef.current;
       const currentPos = cursorPosRef.current;
 
-      if ((currentStep !== "packages" && currentStep !== "select_photos") || !currentPos) {
-        if (hoveredPkgId) {
-          setHoveredPkgId(null);
+      // Only allow hover dwell on selection steps
+      const isSelectionStep =
+        currentStep === "select_package" ||
+        currentStep === "select_format" ||
+        currentStep === "select_theme";
+
+      if (!isSelectionStep || !currentPos || Date.now() < dwellCooldownRef.current || isTransitioningRef.current) {
+        if (hoveredItemId) {
+          setHoveredItemId(null);
           setDwellProgress(0);
           if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
         }
@@ -655,14 +776,12 @@ export default function BoothPage() {
         (currentPos.y / 100) * window.innerHeight
       );
 
-      const pkgElem = elements.find((el) => el.getAttribute("data-package-id"));
-      const photoElem = elements.find((el) => el.getAttribute("data-photo-index"));
-      const actionElem = elements.find((el) => el.getAttribute("data-action-id"));
+      const itemElem = elements.find((el) => el.getAttribute("data-dwell-id"));
 
-      if (pkgElem && currentStep === "packages") {
-        const pkgId = pkgElem.getAttribute("data-package-id");
-        if (pkgId && pkgId !== hoveredPkgId) {
-          setHoveredPkgId(pkgId);
+      if (itemElem) {
+        const itemId = itemElem.getAttribute("data-dwell-id");
+        if (itemId && itemId !== hoveredItemId) {
+          setHoveredItemId(itemId);
           setDwellProgress(0);
 
           if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
@@ -670,87 +789,92 @@ export default function BoothPage() {
           let startTime = Date.now();
           dwellTimerRef.current = setInterval(() => {
             const elapsed = Date.now() - startTime;
-            const pct = Math.min(100, Math.round((elapsed / 1200) * 100));
+            const pct = Math.min(100, Math.round((elapsed / 1300) * 100)); // 1.3s dwell
             setDwellProgress(pct);
 
             if (pct >= 100) {
               clearInterval(dwellTimerRef.current!);
-              const targetPkg = PACKAGES.find((p) => p.id === pkgId);
-              if (targetPkg) callbacksRef.current.handleSelectPackage?.(targetPkg);
+              itemElem.dispatchEvent(new MouseEvent("click", { bubbles: true }));
             }
-          }, 50);
-        }
-      } else if (photoElem && currentStep === "select_photos") {
-        const idxStr = photoElem.getAttribute("data-photo-index");
-        if (idxStr !== null) {
-          const pIdx = parseInt(idxStr, 10);
-          if (`photo-${pIdx}` !== hoveredPkgId) {
-            setHoveredPkgId(`photo-${pIdx}`);
-            setDwellProgress(0);
-
-            if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
-
-            let startTime = Date.now();
-            dwellTimerRef.current = setInterval(() => {
-              const elapsed = Date.now() - startTime;
-              const pct = Math.min(100, Math.round((elapsed / 1200) * 100));
-              setDwellProgress(pct);
-
-              if (pct >= 100) {
-                clearInterval(dwellTimerRef.current!);
-                togglePhotoSelection(pIdx);
-              }
-            }, 50);
-          }
-        }
-      } else if (actionElem && currentStep === "select_photos") {
-        const actId = actionElem.getAttribute("data-action-id");
-        if (actId && `action-${actId}` !== hoveredPkgId) {
-          setHoveredPkgId(`action-${actId}`);
-          setDwellProgress(0);
-
-          if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
-
-          let startTime = Date.now();
-          dwellTimerRef.current = setInterval(() => {
-            const elapsed = Date.now() - startTime;
-            const pct = Math.min(100, Math.round((elapsed / 1200) * 100));
-            setDwellProgress(pct);
-
-            if (pct >= 100) {
-              clearInterval(dwellTimerRef.current!);
-              if (actId === "print") {
-                callbacksRef.current.handleStartDriveUpload?.();
-                callbacksRef.current.setStep?.("print_confirm");
-              } else if (actId === "retake") {
-                callbacksRef.current.setCapturedPhotos?.([]);
-                callbacksRef.current.setCurrentPoseIndex?.(0);
-                callbacksRef.current.setStep?.("pose_ready");
-              }
-            }
-          }, 50);
+          }, 40);
         }
       } else {
-        if (hoveredPkgId) {
-          setHoveredPkgId(null);
+        if (hoveredItemId) {
+          setHoveredItemId(null);
           setDwellProgress(0);
           if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
         }
       }
-    }, 100);
+    }, 80);
 
     return () => clearInterval(hoverInterval);
-  }, [hoveredPkgId, togglePhotoSelection]);
+  }, [hoveredItemId]);
 
-  // ===== QRIS 5-SECOND BYPASS TIMER =====
+  // ===== SELECTION HANDLERS WITH CLEAR LOCK-IN PAUSE =====
+  const handleSelectPackage = (pkg: PackageItem) => {
+    if (isTransitioningRef.current) return;
+    isTransitioningRef.current = true;
+    setLockedSelectionId(pkg.id);
+    setSelectedPkg(pkg);
+    setHoveredItemId(null);
+    setDwellProgress(0);
+    if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
+
+    // Brief confirmation pause (800ms) so user sees checkmark before next step
+    setTimeout(() => {
+      isTransitioningRef.current = false;
+      setStep("select_format");
+    }, 850);
+  };
+
+  const handleSelectFormat = (fmt: FormatItem) => {
+    if (isTransitioningRef.current) return;
+    isTransitioningRef.current = true;
+    setLockedSelectionId(fmt.id);
+    setSelectedFormat(fmt);
+    setHoveredItemId(null);
+    setDwellProgress(0);
+    if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
+
+    setTimeout(() => {
+      isTransitioningRef.current = false;
+      setStep("select_theme");
+    }, 850);
+  };
+
+  const handleSelectTheme = (thm: ThemeItem) => {
+    if (isTransitioningRef.current) return;
+    isTransitioningRef.current = true;
+    setLockedSelectionId(thm.id);
+    setSelectedTheme(thm);
+    setHoveredItemId(null);
+    setDwellProgress(0);
+    if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
+
+    setTimeout(() => {
+      isTransitioningRef.current = false;
+      if (!ENABLE_PAYMENT) {
+        setCapturedPhotos([]);
+        setCurrentPoseIndex(0);
+        setStep("pose_ready");
+      } else {
+        setStep("payment_qris");
+      }
+    }, 850);
+  };
+
+  // ===== QRIS PAYMENT SIMULATION TIMER =====
   useEffect(() => {
-    if (step === "qris") {
+    if (step === "payment_qris") {
       setQrisTimer(5);
       const interval = setInterval(() => {
         setQrisTimer((prev) => {
           if (prev <= 1) {
             clearInterval(interval);
-            setStep("paid_success");
+            // Payment success! Proceed to pose ready
+            setCapturedPhotos([]);
+            setCurrentPoseIndex(0);
+            setStep("pose_ready");
             return 0;
           }
           return prev - 1;
@@ -759,19 +883,7 @@ export default function BoothPage() {
 
       return () => clearInterval(interval);
     }
-  }, [step]);
-
-  // ===== PAID SUCCESS -> POSE READY TRANSITION =====
-  useEffect(() => {
-    if (step === "paid_success") {
-      const timer = setTimeout(() => {
-        setCapturedPhotos([]);
-        setCurrentPoseIndex(0);
-        setStep("pose_ready");
-      }, 2500);
-      return () => clearTimeout(timer);
-    }
-  }, [step]);
+  }, [step, setStep]);
 
   // ===== PHOTO COUNTDOWN & SNAPSHOT CAPTURE ENGINE =====
   useEffect(() => {
@@ -795,17 +907,15 @@ export default function BoothPage() {
 
                 if (updated.length < totalPoses) {
                   setCurrentPoseIndex(updated.length);
-                  setTimeout(() => setStep("pose_ready"), 600);
+                  setTimeout(() => setStep("pose_ready"), 700);
                 } else {
-                  // All poses captured! Prepare photo selection state
-                  const defaultSelected = Array.from({ length: totalPoses }, (_, i) => i);
-                  setSelectedPhotoIndices(defaultSelected);
-                  setTimeout(() => setStep("select_photos"), 600);
+                  // All poses captured! Go to Preview / Retake
+                  setTimeout(() => setStep("preview_retake"), 700);
                 }
                 return updated;
               });
             } else {
-              setStep("pose_ready");
+              setTimeout(() => setStep("preview_retake"), 500);
             }
             return 0;
           }
@@ -815,17 +925,64 @@ export default function BoothPage() {
 
       return () => clearInterval(interval);
     }
-  }, [step, captureSnapshot, selectedPkg]);
+  }, [step, captureSnapshot, selectedPkg, setStep]);
 
-  // ===== FINAL QR CODE DOWNLOAD AUTO-RESET TIMER (15 SECONDS) =====
+  // ===== PROCESSING (CANVAS COMPOSITING 300 DPI) =====
+  useEffect(() => {
+    if (step === "processing") {
+      setProcessProgress(10);
+      const progTimer = setInterval(() => {
+        setProcessProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(progTimer);
+            return 90;
+          }
+          return prev + 25;
+        });
+      }, 300);
+
+      // Generate composite canvas
+      generateFilmStrip(capturedPhotos).then((base64) => {
+        photostripBase64Ref.current = base64;
+        clearInterval(progTimer);
+        setProcessProgress(100);
+        setTimeout(() => {
+          setStep("print_session");
+        }, 500);
+      });
+
+      return () => clearInterval(progTimer);
+    }
+  }, [step, capturedPhotos, generateFilmStrip, setStep]);
+
+  // ===== QR DOWNLOAD TIMEOUT (20S) -> AUTO TO THANK YOU =====
   useEffect(() => {
     if (step === "qr_download") {
-      setQrTimer(15);
+      setQrTimer(20);
       const interval = setInterval(() => {
         setQrTimer((prev) => {
           if (prev <= 1) {
             clearInterval(interval);
-            resetAllToIdle();
+            setStep("thank_you");
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [step, setStep]);
+
+  // ===== THANK YOU AUTO-RESET (5S) -> IDLE =====
+  useEffect(() => {
+    if (step === "thank_you") {
+      setThankYouTimer(5);
+      const interval = setInterval(() => {
+        setThankYouTimer((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            handleResetToIdle();
             return 0;
           }
           return prev - 1;
@@ -836,74 +993,43 @@ export default function BoothPage() {
     }
   }, [step]);
 
-  // ===== ACTION HANDLERS =====
-  function resetAllToIdle() {
-    setStep("idle");
+  // ===== RESET STATE TO IDLE =====
+  const handleResetToIdle = () => {
     setSelectedPkg(null);
     setCapturedPhotos([]);
     setCurrentPoseIndex(0);
-    setSelectedPhotoIndices([]);
     setEmailInput("");
-    setIsRecordingVoice(false);
-    setWaveDetected(false);
     setDriveFolderUrl("");
     setDriveFolderName("");
     setIsUploading(false);
-    emailPendingTargetRef.current = null;
+    setIsPrinting(false);
     photostripBase64Ref.current = "";
     lastProcessedGestureRef.current = "none";
-    if (waveTimerRef.current) {
-      clearTimeout(waveTimerRef.current);
-      waveTimerRef.current = null;
-    }
-    if (dwellTimerRef.current) {
-      clearTimeout(dwellTimerRef.current);
-      dwellTimerRef.current = null;
-    }
-  }
+    setStep("idle");
+  };
 
-  function handleSelectPackage(pkg: PackageItem) {
-    const activePkg = !ENABLE_PAYMENT
-      ? { ...pkg, poses: FREE_MODE_POSES, price: "Gratis (Free Mode)" }
-      : pkg;
-    setSelectedPkg(activePkg);
-    setHoveredPkgId(null);
-    setDwellProgress(0);
-    if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
+  // Preview Actions
+  const handleConfirmPreview = () => {
+    setStep("processing");
+  };
 
-    if (!ENABLE_PAYMENT) {
-      setCapturedPhotos([]);
-      setCurrentPoseIndex(0);
-      setStep("pose_ready");
-    } else {
-      setStep("confirm");
-    }
-  }
+  const handleRetake = () => {
+    setCapturedPhotos([]);
+    setCurrentPoseIndex(0);
+    setStep("pose_ready");
+  };
 
-  function handleConfirmYes() {
-    if (!ENABLE_PAYMENT) {
-      setCapturedPhotos([]);
-      setCurrentPoseIndex(0);
-      setStep("pose_ready");
-    } else {
-      setStep("qris");
-    }
-  }
+  // Print Action
+  const handleSimulatePrint = () => {
+    setIsPrinting(true);
+    setTimeout(() => {
+      setIsPrinting(false);
+      handleStartDriveUpload();
+      setStep("upload_digital");
+    }, 2800);
+  };
 
-  function handleConfirmNo() {
-    setSelectedPkg(null);
-    setStep("packages");
-  }
-
-  function togglePhotoSelection(index: number) {
-    setSelectedPhotoIndices((prev) =>
-      prev.includes(index)
-        ? prev.filter((i) => i !== index)
-        : [...prev, index]
-    );
-  }
-
-  // ===== CLEANUP =====
+  // ===== ADMIN & CLEANUP =====
   const cleanup = useCallback(() => {
     mediaPipeRef.current?.destroy();
     if (streamRef.current) {
@@ -911,7 +1037,6 @@ export default function BoothPage() {
     }
   }, []);
 
-  // ===== HIDDEN ADMIN ESCAPE =====
   const handleHiddenTap = useCallback(() => {
     setHiddenTapCount((prev) => {
       const newCount = prev + 1;
@@ -924,7 +1049,6 @@ export default function BoothPage() {
     });
   }, []);
 
-  // ===== ADMIN LOGOUT =====
   const handleAdminLogout = useCallback(async () => {
     const session = getSession();
     if (!session || !adminPassword) return;
@@ -944,43 +1068,40 @@ export default function BoothPage() {
     }
   }, [adminPassword, router]);
 
+  // Set Callbacks for MediaPipe
   callbacksRef.current = {
-    handleStartDriveUpload,
-    handleSendEmailAndFinish,
-    handleConfirmYes,
-    handleConfirmNo,
-    handleSelectPackage,
-    setCapturedPhotos,
-    setCurrentPoseIndex,
     setStep,
-    setSelectedPkg,
-    scrollContainerRef,
+    handleConfirmPreview,
+    handleRetake,
     startRecordingVoice,
     stopRecordingVoice,
   };
 
-  if (!mounted) return null;
-
   return (
-    <div className="relative w-full h-screen bg-dark overflow-hidden select-none font-sans">
-      {/* Camera Feed */}
+    <div className="relative w-screen h-screen bg-[#090a12] text-[#f7f7fb] overflow-hidden select-none font-sans">
+      {/* Hidden 5-Tap Admin Trigger (Top-Right Corner) */}
+      <div
+        onClick={handleHiddenTap}
+        className="absolute top-0 right-0 w-24 h-24 z-50 cursor-pointer opacity-0"
+        title="Admin tap zone"
+      />
+
+      {/* ===== CAMERA BACKGROUND FEED ===== */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted
-        className="absolute inset-0 w-full h-full object-cover camera-feed transform -scale-x-100"
+        className="camera-feed absolute inset-0 -scale-x-100 filter brightness-[1.02] contrast-[1.04]"
       />
 
-      {/* Debug Skeleton Canvas Overlay */}
+      {/* Debug Skeleton Canvas */}
       <canvas
         ref={canvasRef}
-        className={`absolute inset-0 w-full h-full pointer-events-none z-20 ${
-          IS_DEBUG ? "block" : "hidden"
-        }`}
+        className={`absolute inset-0 z-10 pointer-events-none ${IS_DEBUG ? "block" : "hidden"}`}
       />
 
-      {/* Studio Xenon Flash Screen Flare */}
+      {/* Xenon Studio Flash FX */}
       <AnimatePresence>
         {xenonFlash && (
           <motion.div
@@ -996,25 +1117,19 @@ export default function BoothPage() {
       {/* Dark Studio Vignette Overlay */}
       <div className="absolute inset-0 camera-vignette pointer-events-none" />
 
-      {/* Camera Viewfinder Optical Corner Brackets (Warm Mustard Accent) */}
-      <div className="camera-bracket-tl opacity-75 pointer-events-none z-30" />
-      <div className="camera-bracket-tr opacity-75 pointer-events-none z-30" />
-      <div className="camera-bracket-bl opacity-75 pointer-events-none z-30" />
-      <div className="camera-bracket-br opacity-75 pointer-events-none z-30" />
+      {/* Framing Corner Brackets */}
+      <div className="camera-bracket-tl opacity-60 pointer-events-none z-30" />
+      <div className="camera-bracket-tr opacity-60 pointer-events-none z-30" />
+      <div className="camera-bracket-bl opacity-60 pointer-events-none z-30" />
+      <div className="camera-bracket-br opacity-60 pointer-events-none z-30" />
 
-      {/* Center Precision Framing Crosshair */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 pointer-events-none z-20 opacity-20">
-        <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-amber-400" />
-        <div className="absolute left-1/2 top-0 bottom-0 w-[1px] bg-amber-400" />
-      </div>
-
-      {/* ===== TOP TELEMETRY HUD BAR ===== */}
-      <header className="absolute top-6 inset-x-8 z-30 flex items-center justify-between pointer-events-none">
+      {/* ===== TOP STATUS BAR ===== */}
+      <header className="absolute top-5 inset-x-8 z-30 flex items-center justify-between pointer-events-none">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2.5 px-3.5 py-1.5 glass-midnight rounded-lg border border-white/10 pointer-events-auto">
-            <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#f59e0b] animate-pulse" />
-            <span className="font-mono-tech text-[11px] font-bold text-zinc-300 tracking-widest uppercase">
-              SAAKA AIBOX // OPTICS
+          <div className="flex items-center gap-2.5 px-3.5 py-1.5 bg-[#10111c]/90 rounded-xl border border-[#292b3b] pointer-events-auto shadow-md">
+            <span className="w-2 h-2 rounded-full bg-[#f0a25c] animate-pulse" />
+            <span className="font-mono-tech text-[11px] font-bold text-white tracking-widest uppercase">
+              AIBOX // OPTICS
             </span>
           </div>
 
@@ -1022,149 +1137,160 @@ export default function BoothPage() {
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="px-3 py-1 bg-amber-500/15 border border-amber-400/40 rounded-lg font-mono-tech text-[10px] text-amber-300 tracking-wider uppercase font-bold shadow-[0_0_12px_rgba(245,158,11,0.2)]"
+              className="px-3 py-1 bg-[#ff7b00]/15 border border-[#ff7b00]/30 rounded-xl font-mono-tech text-[10px] text-[#f0a25c] tracking-wider uppercase font-bold"
             >
               GESTURE: {lastDetectedGesture.toUpperCase()}
             </motion.div>
           )}
         </div>
 
-        <div className="flex items-center gap-2 px-3.5 py-1.5 glass-midnight rounded-lg border border-white/10 pointer-events-auto">
-          <div className={`w-2 h-2 rounded-full ${!ENABLE_PAYMENT ? "bg-emerald-400" : "bg-blue-400"} animate-pulse`} />
-          <span className="font-mono-tech text-white/90 text-[11px] font-medium tracking-wider uppercase">
-            {IS_DEBUG ? "TELEMETRY [DEBUG]" : !ENABLE_PAYMENT ? `FREE MODE (${FREE_MODE_POSES} POSES)` : "KIOSK READY"}
+        <div className="flex items-center gap-2 px-3.5 py-1.5 bg-[#10111c]/90 rounded-xl border border-[#292b3b] pointer-events-auto shadow-md">
+          <div className={`w-2 h-2 rounded-full ${!ENABLE_PAYMENT ? "bg-emerald-400" : "bg-[#246cff]"} animate-pulse`} />
+          <span className="font-mono-tech text-white text-[11px] font-medium tracking-wider uppercase">
+            {!ENABLE_PAYMENT ? `FREE MODE (${FREE_MODE_POSES} POSES)` : "KIOSK READY"}
           </span>
         </div>
       </header>
 
-      {/* ===== SPATIAL RETICLE (WARM MUSTARD & DEEP BLUE ACCENTS) ===== */}
-      {(step === "packages" || step === "select_photos") && (
+      {/* ===== RETICLE SENSOR CURSOR ===== */}
+      {cameraReady && (
         <div
           ref={cursorRef}
-          className="fixed pointer-events-none z-50 transform -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-200"
-          style={{ left: `50%`, top: `50%` }}
+          className="fixed pointer-events-none z-50 transform -translate-x-1/2 -translate-y-1/2 transition-opacity duration-150 opacity-0"
+          style={{ width: "70px", height: "70px" }}
         >
-          <div className="relative flex items-center justify-center w-20 h-20">
-            {/* Outer Rotating Dotted Camera Sight */}
-            <div className="absolute inset-0 rounded-full border border-dashed border-amber-400/50 animate-spin-slow" />
-
-            {/* Dwell Progress Radial Gauge */}
-            {hoveredPkgId && (
-              <svg className="absolute inset-0 w-20 h-20 transform -rotate-90">
+          <div className="relative w-full h-full flex items-center justify-center">
+            {hoveredItemId && (
+              <svg className="absolute inset-0 w-full h-full transform -rotate-90">
                 <circle
-                  cx="40"
-                  cy="40"
-                  r="34"
-                  stroke="rgba(245, 158, 11, 0.2)"
+                  cx="35"
+                  cy="35"
+                  r="30"
+                  stroke="rgba(240, 162, 92, 0.2)"
                   strokeWidth="3"
                   fill="none"
                 />
                 <circle
-                  cx="40"
-                  cy="40"
-                  r="34"
-                  stroke="#f59e0b"
+                  cx="35"
+                  cy="35"
+                  r="30"
+                  stroke="#f0a25c"
                   strokeWidth="3.5"
-                  strokeDasharray="213"
-                  strokeDashoffset={213 - (213 * dwellProgress) / 100}
+                  strokeDasharray="188"
+                  strokeDashoffset={188 - (188 * dwellProgress) / 100}
                   strokeLinecap="round"
                   fill="none"
-                  className="transition-all duration-75 drop-shadow-[0_0_8px_#f59e0b]"
+                  className="transition-all duration-75 drop-shadow-[0_0_8px_#f0a25c]"
                 />
               </svg>
             )}
 
-            {/* Inner Precision Crosshair */}
-            <div className="w-8 h-8 rounded-full border border-amber-300/80 bg-obsidian-900/60 backdrop-blur-md flex items-center justify-center shadow-[0_0_15px_rgba(245,158,11,0.5)]">
-              <div className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#f59e0b] animate-ping" />
+            <div className="w-6 h-6 rounded-full border border-[#f0a25c] bg-[#10111c]/70 backdrop-blur-md flex items-center justify-center">
+              <div className="w-2 h-2 rounded-full bg-[#f0a25c] animate-ping" />
               <div className="w-1.5 h-1.5 rounded-full bg-white absolute" />
             </div>
-
-            {/* Optical Target Ticks */}
-            <div className="absolute -top-1 w-1 h-2 bg-amber-400/80" />
-            <div className="absolute -bottom-1 w-1 h-2 bg-amber-400/80" />
-            <div className="absolute -left-1 h-1 w-2 bg-amber-400/80" />
-            <div className="absolute -right-1 h-1 w-2 bg-amber-400/80" />
           </div>
         </div>
       )}
 
-      {/* ===== IDLE STEP (AMBIENT RADAR SONAR & WAVE GUIDE) ===== */}
+      {/* ========================================================== */}
+      {/* ===== STEP 1: IDLE / HOME (WELCOME & ONBOARDING GUIDE) ===== */}
+      {/* ========================================================== */}
       <AnimatePresence mode="wait">
         {step === "idle" && (
           <motion.div
             key="idle"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.35 } }}
-            className="absolute inset-0 flex flex-col items-center justify-between z-20 py-14 px-6 sm:px-12 text-center"
+            exit={{ opacity: 0, scale: 0.96 }}
+            className="absolute inset-0 flex flex-col items-center justify-between z-20 py-12 px-6 sm:px-12 text-center"
           >
             <div className="h-6" />
 
-            {/* Central Branding with Ambient Mustard Sonar Ping */}
+            {/* Central Welcome Info */}
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
-              className="flex flex-col items-center justify-center gap-5 max-w-4xl relative"
+              className="flex flex-col items-center justify-center gap-4 max-w-2xl relative"
             >
               <div className="relative mb-2">
-                <div className="absolute -inset-8 rounded-full bg-amber-500/10 animate-sonar-mustard pointer-events-none" />
-                <div className="absolute -inset-16 rounded-full bg-blue-500/10 animate-sonar-mustard [animation-delay:1.4s] pointer-events-none" />
-
-                <div className="relative">
-                  <Logo size="xl" variant="splash" animated priority />
-                </div>
+                <Logo size="lg" variant="splash" animated priority />
               </div>
 
-              <div>
-                <h1 className="text-4xl sm:text-6xl font-extrabold text-white tracking-tight drop-shadow-2xl font-display mb-2">
-                  AI Box Photobooth
-                </h1>
-                <p className="font-mono-tech text-amber-400 text-xs sm:text-sm tracking-[0.25em] uppercase font-semibold">
-                  Touchless Studio Photobox Experience
-                </p>
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#ff7b00]/10 border border-[#ff7b00]/25 text-[#f0a25c] text-xs font-semibold tracking-wider uppercase">
+                <Sparkles className="w-3.5 h-3.5 text-[#ff7b00]" />
+                <span>Touchless Photobox Experience</span>
+              </div>
+
+              <h1 className="text-4xl sm:text-6xl font-bold text-white tracking-[-0.05em] leading-[0.98]">
+                Selamat Datang di<br />
+                <span className="text-[#f0a25c]">AI Box Photobooth</span>
+              </h1>
+
+              <p className="text-[#9b9eaf] text-sm sm:text-base max-w-md mx-auto leading-relaxed">
+                Nikmati pengalaman foto modern tanpa sentuh layar. Cukup lambaikan tangan untuk
+                memilih paket, tentukan format favorit, dan dapatkan cetakan HD instan.
+              </p>
+
+              {/* 3 Quick Step Pills */}
+              <div className="grid grid-cols-3 gap-3 w-full max-w-lg mt-2">
+                <div className="p-3 bg-[#10111c]/80 rounded-xl border border-[#292b3b] text-left">
+                  <span className="font-mono-tech text-[10px] text-[#f0a25c] font-bold block mb-1">01</span>
+                  <span className="text-xs font-semibold text-white block">Lambaikan Tangan</span>
+                  <span className="text-[10px] text-[#9b9eaf]">Mulai sesi interaktif</span>
+                </div>
+                <div className="p-3 bg-[#10111c]/80 rounded-xl border border-[#292b3b] text-left">
+                  <span className="font-mono-tech text-[10px] text-[#246cff] font-bold block mb-1">02</span>
+                  <span className="text-xs font-semibold text-white block">Pilih Tema & Format</span>
+                  <span className="text-[10px] text-[#9b9eaf]">Sentuh atau arahkan sensor</span>
+                </div>
+                <div className="p-3 bg-[#10111c]/80 rounded-xl border border-[#292b3b] text-left">
+                  <span className="font-mono-tech text-[10px] text-emerald-400 font-bold block mb-1">03</span>
+                  <span className="text-xs font-semibold text-white block">Pose & Cetak</span>
+                  <span className="text-[10px] text-[#9b9eaf]">Cetak & unduh via QR</span>
+                </div>
               </div>
             </motion.div>
 
-            {/* Bottom Wave Guide Floating Pod */}
+            {/* Bottom Wave Action Pod */}
             <motion.div
-              initial={{ opacity: 0, y: 24 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
               className="relative"
             >
-              <div className="flex items-center gap-5 px-7 py-4 glass-midnight rounded-2xl border border-amber-400/30 shadow-[0_10px_40px_rgba(245,158,11,0.15)]">
+              <div
+                onClick={() => setStep("select_package")}
+                className="flex items-center gap-4 px-6 py-3.5 bg-[#10111c] rounded-2xl border border-[#292b3b] shadow-2xl hover:border-[#f0a25c]/50 transition-all cursor-pointer"
+              >
                 <motion.div
-                  animate={{ rotate: [0, 18, -18, 18, 0] }}
+                  animate={{ rotate: [0, 16, -16, 16, 0] }}
                   transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-                  className="w-13 h-13 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/30 flex-shrink-0 text-obsidian-950 font-bold"
+                  className="w-12 h-12 rounded-xl bg-[#246cff] flex items-center justify-center text-white font-bold shadow-md shadow-[#246cff]/25"
                 >
-                  <Hand className="w-7 h-7 sm:w-8 sm:h-8" />
+                  <Hand className="w-6 h-6" />
                 </motion.div>
 
-                <div className="text-left pr-3">
-                  <h3 className="text-white font-display font-extrabold text-lg sm:text-xl leading-tight">
+                <div className="text-left pr-2">
+                  <h3 className="text-white font-bold text-base leading-tight">
                     Lambaikan Tangan Ke Kamera
                   </h3>
-                  <p className="font-mono-tech text-zinc-400 text-xs mt-0.5 tracking-wider uppercase">
-                    Wave Hand Left to Right to Start
+                  <p className="font-mono-tech text-[#9b9eaf] text-[11px] tracking-wider uppercase mt-0.5">
+                    Atau Sentuh Di Sini Untuk Mulai
                   </p>
                 </div>
+                <ChevronRight className="w-5 h-5 text-[#f0a25c]" />
               </div>
 
               {waveDetected && (
                 <motion.div
                   initial={{ scale: 0.8, opacity: 0, y: 15 }}
                   animate={{ scale: 1, opacity: 1, y: 0 }}
-                  className="absolute -top-14 left-1/2 -translate-x-1/2 px-5 py-2 bg-emerald-500 text-white rounded-lg font-display font-extrabold text-xs shadow-xl flex items-center gap-2 border border-emerald-400 whitespace-nowrap"
+                  className="absolute -top-12 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-emerald-500 text-white rounded-lg font-bold text-xs shadow-xl flex items-center gap-2 whitespace-nowrap"
                 >
-                  <motion.div
-                    animate={{ scale: [1, 1.5, 1] }}
-                    transition={{ duration: 0.4, repeat: Infinity }}
-                    className="w-2 h-2 rounded-full bg-white"
-                  />
-                  <span>Lambaian Terdeteksi! Menyiapkan...</span>
+                  <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                  <span>Lambaian Terdeteksi! Memulai...</span>
                 </motion.div>
               )}
             </motion.div>
@@ -1172,102 +1298,109 @@ export default function BoothPage() {
         )}
       </AnimatePresence>
 
-      {/* ===== PACKAGE SELECTION STEP (MIDNIGHT CARDS WITH MUSTARD ACCENTS) ===== */}
+      {/* ========================================================== */}
+      {/* ===== STEP 2: PILIH PAKET (1, 2, 3) ===================== */}
+      {/* ========================================================== */}
       <AnimatePresence>
-        {step === "packages" && (
+        {step === "select_package" && (
           <motion.div
-            key="packages"
-            initial={{ opacity: 0, scale: 0.95 }}
+            key="select_package"
+            initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.97 }}
-            transition={{ duration: 0.35, ease: "easeOut" }}
-            className="absolute inset-0 z-30 flex flex-col items-center justify-between p-6 sm:p-12 text-center"
+            exit={{ opacity: 0, scale: 0.96 }}
+            className="absolute inset-0 z-30 flex flex-col items-center justify-between p-6 sm:p-10 text-center"
           >
-            <div className="mt-6">
-              <div className="inline-flex items-center gap-2 px-3 py-1 glass-midnight rounded-md text-amber-400 font-mono-tech text-xs tracking-widest uppercase mb-2.5 border border-amber-400/30">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                Touchless Selection System Active
+            <div className="mt-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-[#ff7b00]/10 border border-[#ff7b00]/25 text-[#f0a25c] font-mono-tech text-xs tracking-wider uppercase mb-2">
+                <span>Langkah 1 Dari 4</span>
               </div>
-              <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight font-display">
-                Pilih Paket Photobooth
+              <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+                Pilih Paket Foto
               </h2>
-              <p className="font-mono-tech text-zinc-400 text-xs sm:text-sm mt-1 tracking-wider uppercase">
-                Arahkan Reticle Sensor atau Klik Kartu Pilihan
+              <p className="text-[#9b9eaf] text-xs sm:text-sm mt-1">
+                Arahkan sensor tangan atau sentuh langsung kartu paket
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl w-full my-auto">
+            {/* Package Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-4xl w-full my-auto">
               {PACKAGES.map((pkg) => {
-                const isHovered = hoveredPkgId === pkg.id;
+                const isHovered = hoveredItemId === pkg.id;
+                const isLocked = lockedSelectionId === pkg.id;
+
                 return (
                   <motion.div
                     key={pkg.id}
-                    data-package-id={pkg.id}
+                    data-dwell-id={pkg.id}
                     onClick={() => handleSelectPackage(pkg)}
-                    whileHover={{ scale: 1.02, y: -4 }}
+                    whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className={`relative rounded-2xl p-7 cursor-pointer transition-all duration-300 text-left flex flex-col justify-between ${
-                      isHovered
-                        ? "glass-midnight glow-mustard-border ring-1 ring-amber-400/60 shadow-[0_0_40px_rgba(245,158,11,0.3)]"
-                        : "glass-midnight hover:border-white/20 shadow-2xl"
+                    className={`relative rounded-2xl p-6 cursor-pointer transition-all duration-200 text-left flex flex-col justify-between border ${
+                      isLocked
+                        ? "bg-[#171927] border-emerald-400 ring-2 ring-emerald-400/50 shadow-2xl"
+                        : isHovered
+                        ? "bg-[#171927] border-[#f0a25c] ring-2 ring-[#f0a25c]/40 shadow-xl"
+                        : "bg-[#10111c] border-[#292b3b] hover:border-[#3b3e5b]"
                     }`}
                   >
                     {pkg.badge && (
-                      <span className="absolute -top-3 right-5 px-3 py-0.5 bg-gradient-to-r from-amber-500 to-amber-600 text-obsidian-950 font-display font-extrabold text-[10px] tracking-wider uppercase rounded-md shadow-md">
+                      <span className="absolute -top-3 right-4 px-2.5 py-0.5 bg-[#f0a25c] text-[#090a12] font-bold text-[10px] tracking-wider uppercase rounded-md shadow-sm">
                         {pkg.badge}
                       </span>
                     )}
 
                     <div>
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-2xl font-extrabold text-white font-display">
-                          {pkg.name}
-                        </h3>
-                        <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
-                          <Camera className="w-5 h-5 text-amber-400" />
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-xl font-bold text-white">{pkg.name}</h3>
+                        <div className="w-8 h-8 rounded-lg bg-[#171927] flex items-center justify-center border border-[#292b3b]">
+                          <Camera className="w-4 h-4 text-[#f0a25c]" />
                         </div>
                       </div>
 
-                      <div className="mb-5">
-                        <span className="text-3xl sm:text-4xl font-black text-white font-display">
+                      <div className="mb-4">
+                        <span className="text-2xl sm:text-3xl font-extrabold text-white block">
                           {pkg.price}
                         </span>
-                        <span className="font-mono-tech text-zinc-400 text-xs block mt-1 tracking-wider uppercase">
-                          {pkg.poses} Pose Film Strip Studio
+                        <span className="text-xs text-[#9b9eaf] block mt-0.5">
+                          {pkg.poses} Pose Foto Studio
                         </span>
                       </div>
 
-                      <ul className="space-y-2.5 border-t border-white/10 pt-4 mb-6">
+                      <ul className="space-y-2 border-t border-[#292b3b] pt-3 mb-4">
                         {pkg.features.map((feat, idx) => (
-                          <li
-                            key={idx}
-                            className="flex items-center gap-2.5 text-xs text-zinc-200 font-medium"
-                          >
-                            <CheckCircle2 className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                          <li key={idx} className="flex items-center gap-2 text-xs text-[#ced0dc]">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-[#f0a25c] flex-shrink-0" />
                             <span>{feat}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
 
-                    <div className="mt-auto">
-                      {isHovered && (
-                        <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden mb-3">
+                    <div>
+                      {/* Dwell Progress Bar */}
+                      {isHovered && !isLocked && (
+                        <div className="w-full bg-[#090a12] h-1.5 rounded-full overflow-hidden mb-2">
                           <div
-                            className="bg-amber-400 h-full transition-all duration-75 shadow-[0_0_8px_#f59e0b]"
+                            className="bg-[#f0a25c] h-full transition-all duration-75"
                             style={{ width: `${dwellProgress}%` }}
                           />
                         </div>
                       )}
 
                       <div
-                        className={`w-full py-3 rounded-xl font-display font-extrabold text-xs tracking-wider uppercase text-center transition-all ${
-                          isHovered
-                            ? "bg-amber-400 text-obsidian-950 shadow-[0_0_20px_rgba(245,158,11,0.4)]"
-                            : "bg-white/10 text-white hover:bg-white/20 border border-white/10"
+                        className={`w-full py-2.5 rounded-xl font-semibold text-xs tracking-wider uppercase text-center transition-all ${
+                          isLocked
+                            ? "bg-emerald-500 text-white font-bold"
+                            : isHovered
+                            ? "bg-[#f0a25c] text-[#090a12] font-bold"
+                            : "bg-[#171927] text-white border border-[#292b3b]"
                         }`}
                       >
-                        {isHovered ? `Mengunci Pilihan (${dwellProgress}%)...` : "Pilih Paket"}
+                        {isLocked
+                          ? "✓ Terpilih!"
+                          : isHovered
+                          ? `Mengunci (${dwellProgress}%)...`
+                          : "Pilih Paket"}
                       </div>
                     </div>
                   </motion.div>
@@ -1277,7 +1410,7 @@ export default function BoothPage() {
 
             <button
               onClick={() => setStep("idle")}
-              className="text-zinc-400 hover:text-white font-mono-tech text-xs tracking-wider uppercase transition-colors flex items-center gap-2 mb-2"
+              className="text-[#9b9eaf] hover:text-white font-mono-tech text-xs tracking-wider uppercase transition-colors flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
               Kembali ke Layar Standby
@@ -1286,589 +1419,631 @@ export default function BoothPage() {
         )}
       </AnimatePresence>
 
-      {/* ===== CONFIRMATION STEP (DUAL GESTURE DOCK) ===== */}
+      {/* ========================================================== */}
+      {/* ===== STEP 3: PILIH UKURAN / FORMAT ====================== */}
+      {/* ========================================================== */}
       <AnimatePresence>
-        {step === "confirm" && selectedPkg && (
+        {step === "select_format" && (
           <motion.div
-            key="confirm"
-            initial={{ opacity: 0, scale: 0.92 }}
+            key="select_format"
+            initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.92 }}
-            className="absolute inset-0 z-40 flex items-center justify-center p-4"
+            exit={{ opacity: 0, scale: 0.96 }}
+            className="absolute inset-0 z-30 flex flex-col items-center justify-between p-6 sm:p-10 text-center"
           >
-            <div className="glass-midnight rounded-2xl p-8 max-w-lg w-full text-center border border-white/15 shadow-[0_0_60px_rgba(0,0,0,0.8)]">
-              <div className="w-14 h-14 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-400/30 flex items-center justify-center mx-auto mb-4 shadow-[0_0_20px_rgba(245,158,11,0.2)]">
-                <Zap className="w-7 h-7" />
+            <div className="mt-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-[#246cff]/10 border border-[#246cff]/25 text-[#246cff] font-mono-tech text-xs tracking-wider uppercase mb-2">
+                <span>Langkah 2 Dari 4</span>
               </div>
-
-              <h3 className="text-2xl font-extrabold text-white font-display mb-1.5">
-                Konfirmasi Pesanan
-              </h3>
-              <p className="text-zinc-300 text-sm mb-6 font-light">
-                Paket <span className="font-bold text-amber-400">{selectedPkg.name}</span> seharga{" "}
-                <span className="font-bold text-emerald-400">{selectedPkg.price}</span> ({selectedPkg.poses} Pose).
+              <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+                Pilih Ukuran / Format Foto
+              </h2>
+              <p className="text-[#9b9eaf] text-xs sm:text-sm mt-1">
+                Tentukan format hasil akhir photostrip Anda
               </p>
-
-              {/* Dual Visual Gesture Cards */}
-              <div className="grid grid-cols-2 gap-4 mb-6 text-left">
-                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col justify-between">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-500 text-obsidian-950 flex items-center justify-center font-bold">
-                      <ThumbsUp className="w-4 h-4" />
-                    </div>
-                    <span className="text-emerald-300 font-display font-extrabold text-xs tracking-wider uppercase">
-                      Lanjut Bayar
-                    </span>
-                  </div>
-                  <span className="font-mono-tech text-[11px] text-zinc-300">
-                    👍 Jempol Ke Atas
-                  </span>
-                </div>
-
-                <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 flex flex-col justify-between">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-7 h-7 rounded-lg bg-rose-500 text-white flex items-center justify-center font-bold">
-                      <ThumbsDown className="w-4 h-4" />
-                    </div>
-                    <span className="text-rose-300 font-display font-extrabold text-xs tracking-wider uppercase">
-                      Batal / Ganti
-                    </span>
-                  </div>
-                  <span className="font-mono-tech text-[11px] text-zinc-300">
-                    👎 Jempol Ke Bawah
-                  </span>
-                </div>
-              </div>
-
-              {/* Action Bar */}
-              <div className="flex gap-3.5">
-                <button
-                  onClick={handleConfirmNo}
-                  className="flex-1 py-3 bg-white/10 hover:bg-white/15 text-zinc-300 rounded-xl font-display font-bold text-xs uppercase tracking-wider transition-all border border-white/10 flex items-center justify-center gap-2"
-                >
-                  <ThumbsDown className="w-4 h-4 text-rose-400" />
-                  Batal (Manual)
-                </button>
-
-                <button
-                  onClick={handleConfirmYes}
-                  className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-obsidian-950 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(16,185,129,0.35)] flex items-center justify-center gap-2"
-                >
-                  <ThumbsUp className="w-4 h-4" />
-                  Lanjut Bayar (Manual)
-                </button>
-              </div>
             </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-4xl w-full my-auto">
+              {FORMATS.map((fmt) => {
+                const isHovered = hoveredItemId === fmt.id;
+                const isLocked = lockedSelectionId === fmt.id;
+
+                return (
+                  <motion.div
+                    key={fmt.id}
+                    data-dwell-id={fmt.id}
+                    onClick={() => handleSelectFormat(fmt)}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`relative rounded-2xl p-6 cursor-pointer transition-all duration-200 text-left flex flex-col justify-between border ${
+                      isLocked
+                        ? "bg-[#171927] border-emerald-400 ring-2 ring-emerald-400/50 shadow-2xl"
+                        : isHovered
+                        ? "bg-[#171927] border-[#246cff] ring-2 ring-[#246cff]/40 shadow-xl"
+                        : "bg-[#10111c] border-[#292b3b] hover:border-[#3b3e5b]"
+                    }`}
+                  >
+                    {fmt.badge && (
+                      <span className="absolute -top-3 right-4 px-2.5 py-0.5 bg-[#246cff] text-white font-bold text-[10px] tracking-wider uppercase rounded-md shadow-sm">
+                        {fmt.badge}
+                      </span>
+                    )}
+
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-xl font-bold text-white">{fmt.name}</h3>
+                        <div className="w-8 h-8 rounded-lg bg-[#171927] flex items-center justify-center border border-[#292b3b]">
+                          <Layers className="w-4 h-4 text-[#246cff]" />
+                        </div>
+                      </div>
+
+                      <span className="font-mono-tech text-xs text-[#f0a25c] font-semibold block mb-3">
+                        Rasio {fmt.ratio}
+                      </span>
+
+                      <p className="text-xs text-[#9b9eaf] leading-relaxed mb-6">
+                        {fmt.description}
+                      </p>
+                    </div>
+
+                    <div>
+                      {isHovered && !isLocked && (
+                        <div className="w-full bg-[#090a12] h-1.5 rounded-full overflow-hidden mb-2">
+                          <div
+                            className="bg-[#246cff] h-full transition-all duration-75"
+                            style={{ width: `${dwellProgress}%` }}
+                          />
+                        </div>
+                      )}
+
+                      <div
+                        className={`w-full py-2.5 rounded-xl font-semibold text-xs tracking-wider uppercase text-center transition-all ${
+                          isLocked
+                            ? "bg-emerald-500 text-white font-bold"
+                            : isHovered
+                            ? "bg-[#246cff] text-white font-bold"
+                            : "bg-[#171927] text-white border border-[#292b3b]"
+                        }`}
+                      >
+                        {isLocked
+                          ? "✓ Format Dipilih!"
+                          : isHovered
+                          ? `Mengunci (${dwellProgress}%)...`
+                          : "Pilih Format"}
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setStep("select_package")}
+              className="text-[#9b9eaf] hover:text-white font-mono-tech text-xs tracking-wider uppercase transition-colors flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Kembali ke Pilih Paket
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ===== QRIS SIMULATION STEP ===== */}
+      {/* ========================================================== */}
+      {/* ===== STEP 4: PILIH TEMA / TEMPLATE ====================== */}
+      {/* ========================================================== */}
       <AnimatePresence>
-        {step === "qris" && selectedPkg && (
+        {step === "select_theme" && (
           <motion.div
-            key="qris"
-            initial={{ opacity: 0, scale: 0.92 }}
+            key="select_theme"
+            initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.92 }}
+            exit={{ opacity: 0, scale: 0.96 }}
+            className="absolute inset-0 z-30 flex flex-col items-center justify-between p-6 sm:p-10 text-center"
+          >
+            <div className="mt-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-[#ff7b00]/10 border border-[#ff7b00]/25 text-[#f0a25c] font-mono-tech text-xs tracking-wider uppercase mb-2">
+                <span>Langkah 3 Dari 4</span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+                Pilih Tema / Template Bingkai
+              </h2>
+              <p className="text-[#9b9eaf] text-xs sm:text-sm mt-1">
+                Pilih palet estetika untuk bingkai cetak foto Anda
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl w-full my-auto">
+              {THEMES.map((thm) => {
+                const isHovered = hoveredItemId === thm.id;
+                const isLocked = lockedSelectionId === thm.id;
+
+                return (
+                  <motion.div
+                    key={thm.id}
+                    data-dwell-id={thm.id}
+                    onClick={() => handleSelectTheme(thm)}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`relative rounded-2xl p-5 cursor-pointer transition-all duration-200 text-left flex flex-col justify-between border ${
+                      isLocked
+                        ? "bg-[#171927] border-emerald-400 ring-2 ring-emerald-400/50 shadow-2xl"
+                        : isHovered
+                        ? "bg-[#171927] border-[#f0a25c] ring-2 ring-[#f0a25c]/40 shadow-xl"
+                        : "bg-[#10111c] border-[#292b3b] hover:border-[#3b3e5b]"
+                    }`}
+                  >
+                    <div>
+                      {/* Theme Visual Palette Swatch */}
+                      <div
+                        className="w-full h-20 rounded-xl mb-3 border p-2 flex flex-col justify-between"
+                        style={{
+                          backgroundColor: thm.bgHex,
+                          borderColor: thm.borderHex,
+                        }}
+                      >
+                        <span
+                          className="font-mono-tech text-[10px] uppercase font-bold"
+                          style={{ color: thm.accentHex }}
+                        >
+                          AI BOX STUDIO
+                        </span>
+                        <div className="flex gap-1.5">
+                          <span
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: thm.accentHex }}
+                          />
+                          <span
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: thm.textHex }}
+                          />
+                        </div>
+                      </div>
+
+                      <h3 className="text-base font-bold text-white mb-1">{thm.name}</h3>
+                      <p className="text-xs text-[#9b9eaf] leading-relaxed mb-4">
+                        {thm.description}
+                      </p>
+                    </div>
+
+                    <div>
+                      {isHovered && !isLocked && (
+                        <div className="w-full bg-[#090a12] h-1.5 rounded-full overflow-hidden mb-2">
+                          <div
+                            className="bg-[#f0a25c] h-full transition-all duration-75"
+                            style={{ width: `${dwellProgress}%` }}
+                          />
+                        </div>
+                      )}
+
+                      <div
+                        className={`w-full py-2 rounded-xl font-semibold text-xs tracking-wider uppercase text-center transition-all ${
+                          isLocked
+                            ? "bg-emerald-500 text-white font-bold"
+                            : isHovered
+                            ? "bg-[#f0a25c] text-[#090a12] font-bold"
+                            : "bg-[#171927] text-white border border-[#292b3b]"
+                        }`}
+                      >
+                        {isLocked
+                          ? "✓ Tema Dipilih!"
+                          : isHovered
+                          ? `Mengunci (${dwellProgress}%)...`
+                          : "Pilih Tema"}
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setStep("select_format")}
+              className="text-[#9b9eaf] hover:text-white font-mono-tech text-xs tracking-wider uppercase transition-colors flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Kembali ke Pilih Format
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================== */}
+      {/* ===== STEP 5: BAYAR QRIS ================================ */}
+      {/* ========================================================== */}
+      <AnimatePresence>
+        {step === "payment_qris" && selectedPkg && (
+          <motion.div
+            key="payment_qris"
+            initial={{ opacity: 0, scale: 0.94 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.94 }}
             className="absolute inset-0 z-40 flex items-center justify-center p-4"
           >
-            <div className="glass-midnight rounded-2xl p-8 max-w-sm w-full text-center border border-amber-400/30 shadow-[0_0_60px_rgba(0,0,0,0.8)]">
-              <div className="flex items-center justify-center gap-2 mb-1.5">
-                <QrCode className="w-5 h-5 text-amber-400" />
-                <span className="text-white font-display font-extrabold text-xl tracking-tight">
+            <div className="bg-[#10111c] rounded-2xl p-7 max-w-sm w-full text-center border border-[#292b3b] shadow-2xl">
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <QrCode className="w-5 h-5 text-[#f0a25c]" />
+                <span className="text-white font-bold text-xl tracking-tight">
                   Pembayaran QRIS
                 </span>
               </div>
 
-              <p className="font-mono-tech text-zinc-400 text-[11px] tracking-wider uppercase mb-4">
-                Scan QRIS via BCA, GoPay, OVO, Dana
+              <p className="font-mono-tech text-[#9b9eaf] text-[11px] tracking-wider uppercase mb-4">
+                Scan via BCA, GoPay, OVO, Dana, ShopeePay
               </p>
 
-              <div className="bg-white p-4 rounded-xl shadow-2xl border border-white/20 inline-block mb-4 relative">
-                <svg
-                  viewBox="0 0 200 200"
-                  className="w-40 h-40 mx-auto"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <rect width="200" height="200" fill="white" />
-                  <path
-                    d="M10 10h60v60H10zM130 10h60v60h-60zM10 130h60v60H10z"
-                    fill="black"
-                  />
-                  <path
-                    d="M25 25h30v30H25zM145 25h30v30h-30zM25 145h30v30H25z"
-                    fill="white"
-                  />
-                  <path
-                    d="M32 32h16v16H32zM152 32h16v16h-16zM32 152h16v16H32z"
-                    fill="black"
-                  />
-                  <path
-                    d="M80 20h15v20H80zM100 20h20v15h-20zM80 50h35v15H80zM20 80h20v25H20z"
-                    fill="#070b14"
-                  />
-                </svg>
-                <span className="text-obsidian-950 font-mono-tech font-extrabold text-[10px] block mt-1 tracking-widest uppercase">
-                  NMID: ID102030405060
-                </span>
+              <div className="bg-white p-3 rounded-xl inline-block mb-3 shadow-inner">
+                <QRCodeSVG
+                  value={`https://qris.id/pay/aibox?amt=${selectedPkg.rawPrice}&pkg=${selectedPkg.id}`}
+                  size={150}
+                  level="H"
+                />
               </div>
 
-              <div className="bg-amber-500/10 border border-amber-400/30 rounded-xl py-2 px-4 mb-4">
-                <span className="font-mono-tech text-amber-300 text-[10px] block uppercase tracking-wider">
-                  Total Tagihan:
+              <div className="bg-[#090a12] border border-[#292b3b] rounded-xl py-2 px-3 mb-4">
+                <span className="text-[10px] text-[#9b9eaf] block uppercase">
+                  {selectedPkg.name} • {selectedFormat.name}
                 </span>
-                <span className="text-white font-display font-extrabold text-2xl tracking-tight">
+                <span className="text-white font-bold text-2xl tracking-tight">
                   {selectedPkg.price}
                 </span>
               </div>
 
-              <div className="flex items-center justify-center gap-2 font-mono-tech text-zinc-400 text-xs">
+              <div className="flex items-center justify-center gap-2 font-mono-tech text-[#9b9eaf] text-xs mb-3">
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  className="w-3.5 h-3.5 border-2 border-amber-400 border-t-transparent rounded-full"
+                  className="w-3.5 h-3.5 border-2 border-[#f0a25c] border-t-transparent rounded-full"
                 />
-                <span>Auto-Verifying Settlement ({qrisTimer}s)...</span>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ===== PAID SUCCESS STEP ===== */}
-      <AnimatePresence>
-        {step === "paid_success" && selectedPkg && (
-          <motion.div
-            key="paid_success"
-            initial={{ opacity: 0, scale: 0.88 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="absolute inset-0 z-40 flex items-center justify-center p-4"
-          >
-            <div className="glass-midnight rounded-2xl p-9 max-w-sm w-full text-center border border-emerald-400/40 shadow-[0_0_60px_rgba(16,185,129,0.3)]">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: [0, 1.2, 1] }}
-                transition={{ duration: 0.5 }}
-                className="w-18 h-18 rounded-xl bg-emerald-500 text-obsidian-950 flex items-center justify-center mx-auto mb-4 shadow-[0_0_30px_rgba(16,185,129,0.5)]"
-              >
-                <Check className="w-9 h-9 stroke-[3]" />
-              </motion.div>
-
-              <h2 className="text-3xl font-extrabold text-white font-display mb-1">
-                Pembayaran Berhasil
-              </h2>
-              <p className="font-mono-tech text-emerald-300 text-xs tracking-wider uppercase mb-3">
-                Paket {selectedPkg.name} Aktif
-              </p>
-              <p className="text-zinc-400 text-xs font-light">
-                Mempersiapkan lensa studio untuk sesi foto...
-              </p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ===== POSE READY STEP (TOP MINIMAL FLOATING CAPSULE) ===== */}
-      <AnimatePresence>
-        {step === "pose_ready" && selectedPkg && (
-          <motion.div
-            key="pose_ready"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="absolute top-8 inset-x-0 z-40 flex flex-col items-center pointer-events-none px-4"
-          >
-            <div className="glass-midnight rounded-xl px-5 py-3 border border-amber-400/40 shadow-2xl flex items-center gap-3.5 pointer-events-auto">
-              <motion.div
-                animate={{ rotate: [0, -10, 10, -10, 0] }}
-                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                className="w-9 h-9 rounded-lg bg-gradient-to-tr from-amber-500 to-amber-600 text-obsidian-950 flex items-center justify-center shadow-md flex-shrink-0"
-              >
-                <PeaceIcon className="w-5 h-5" />
-              </motion.div>
-
-              <div className="text-left pr-2">
-                <span className="font-mono-tech text-amber-300 font-bold text-[10px] uppercase tracking-wider block">
-                  Pose #{currentPoseIndex + 1} / {selectedPkg.poses}
-                </span>
-                <h3 className="text-white font-display font-extrabold text-sm sm:text-base leading-tight">
-                  Tunjukkan Gestur Peace (✌️) Untuk Mulai
-                </h3>
+                <span>Memverifikasi Pembayaran ({qrisTimer}s)...</span>
               </div>
 
               <button
-                onClick={() => setStep("countdown")}
-                className="px-3.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-obsidian-950 text-xs font-display font-extrabold rounded-lg transition-all shadow-[0_0_12px_rgba(245,158,11,0.4)] ml-1"
-              >
-                Klik Foto
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ===== PHOTO COUNTDOWN STEP (STUDIO SHUTTER DIAL) ===== */}
-      <AnimatePresence>
-        {step === "countdown" && selectedPkg && (
-          <motion.div
-            key="countdown"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/25 p-4 text-center pointer-events-none"
-          >
-            <div className="absolute top-8 px-4 py-1.5 glass-midnight rounded-md border border-amber-400/30 font-mono-tech text-amber-300 text-xs font-bold uppercase tracking-widest">
-              Pose #{currentPoseIndex + 1} / {selectedPkg.poses}
-            </div>
-
-            {/* Rotating Aperture Shutter Ring */}
-            <div className="relative flex items-center justify-center w-60 h-60 sm:w-72 sm:h-72 mb-4">
-              <div className="absolute inset-0 rounded-full border border-dashed border-amber-400/40 animate-spin-slow" />
-              <div className="absolute inset-5 rounded-full border border-white/10" />
-
-              <motion.div
-                key={photoCountdown}
-                initial={{ scale: 0.6, opacity: 0 }}
-                animate={{ scale: 1.15, opacity: 1 }}
-                exit={{ scale: 1.8, opacity: 0 }}
-                transition={{ duration: 0.75, ease: "easeOut" }}
-                className="text-8xl sm:text-9xl font-black text-white font-display drop-shadow-[0_0_50px_#f59e0b] flex items-center justify-center gap-3"
-              >
-                {photoCountdown > 0 ? (
-                  photoCountdown
-                ) : (
-                  <>
-                    <Camera className="w-18 h-18 text-amber-400 animate-bounce" />
-                    <span>SMILE!</span>
-                  </>
-                )}
-              </motion.div>
-            </div>
-
-            <p className="font-mono-tech text-amber-200 text-sm sm:text-base font-medium tracking-wider uppercase drop-shadow-md">
-              {photoCountdown > 0 ? "STRIKE A POSE!" : "CAPTURING STUDIO SHOT..."}
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ===== SELECT PHOTOS GRID STEP ===== */}
-      <AnimatePresence>
-        {step === "select_photos" && selectedPkg && (
-          <motion.div
-            key="select_photos"
-            ref={scrollContainerRef}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="absolute inset-0 z-30 flex flex-col items-center justify-between p-6 sm:p-10 text-center bg-obsidian-950/95 backdrop-blur-2xl overflow-y-auto"
-          >
-            <div className="mt-4">
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-display">
-                Kurasi Foto Film Strip
-              </h2>
-              <p className="font-mono-tech text-zinc-400 text-xs sm:text-sm mt-1 tracking-wider uppercase">
-                Gunakan Reticle Sensor atau Klik Foto untuk Menyeleksi
-              </p>
-            </div>
-
-            {/* Grid Showcase & Live Film Strip Preview */}
-            <div className="flex flex-col md:flex-row gap-8 max-w-5xl w-full my-auto items-center justify-center">
-              {/* Photos Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 flex-1">
-                {capturedPhotos.map((photoUrl, idx) => {
-                  const isSelected = selectedPhotoIndices.includes(idx);
-                  const isHovered = hoveredPkgId === `photo-${idx}`;
-
-                  return (
-                    <motion.div
-                      key={idx}
-                      data-photo-index={idx}
-                      onClick={() => togglePhotoSelection(idx)}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      className={`relative rounded-xl overflow-hidden aspect-[4/3] cursor-pointer border transition-all duration-200 ${
-                        isSelected
-                          ? "border-amber-400 ring-2 ring-amber-400/50 shadow-[0_0_25px_rgba(245,158,11,0.3)]"
-                          : "border-white/10 opacity-60 hover:opacity-100"
-                      } ${isHovered ? "ring-2 ring-amber-300 scale-[1.03]" : ""}`}
-                    >
-                      <img
-                        src={photoUrl}
-                        alt={`Pose ${idx + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute top-2 left-2 px-2 py-0.5 bg-obsidian-950/80 backdrop-blur-md rounded font-mono-tech text-white font-bold text-[9px] tracking-wider uppercase border border-white/10">
-                        SHOT #{idx + 1}
-                      </div>
-
-                      {isSelected && (
-                        <div className="absolute top-2 right-2 w-6 h-6 bg-amber-400 rounded-full flex items-center justify-center text-obsidian-950 font-black shadow-md">
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        </div>
-                      )}
-                    </motion.div>
-                  );
-                })}
-              </div>
-
-              {/* Physical Film Strip Tray Preview */}
-              <div className="w-48 bg-obsidian-900/90 rounded-2xl p-3 border border-white/15 shadow-2xl flex flex-col items-center flex-shrink-0 relative">
-                <div className="flex items-center gap-2 mb-2.5">
-                  <Logo size="sm" variant="rounded" animated={false} />
-                  <span className="font-mono-tech text-amber-400 text-[10px] font-bold tracking-wider uppercase">
-                    AI BOX STRIP
-                  </span>
-                </div>
-
-                <div className="space-y-2 w-full">
-                  {selectedPhotoIndices.map((pIdx) => (
-                    <div
-                      key={pIdx}
-                      className="w-full aspect-[4/3] rounded-lg overflow-hidden border border-white/20 bg-obsidian-950 shadow-md"
-                    >
-                      <img
-                        src={capturedPhotos[pIdx]}
-                        alt={`Strip pose ${pIdx + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-3 pt-2 border-t border-white/10 w-full text-center">
-                  <span className="font-mono-tech text-zinc-400 text-[9px] font-semibold uppercase tracking-widest block">
-                    300 DPI // PRINT READY
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Bar */}
-            <div className="flex gap-3.5">
-              <button
-                data-action-id="retake"
                 onClick={() => {
                   setCapturedPhotos([]);
                   setCurrentPoseIndex(0);
                   setStep("pose_ready");
                 }}
-                className={`px-6 py-3 rounded-xl font-display font-bold text-xs uppercase tracking-wider transition-all border flex items-center gap-2 ${
-                  hoveredPkgId === "action-retake"
-                    ? "bg-amber-400 text-obsidian-950 border-amber-400 ring-2 ring-amber-400/50 scale-105 shadow-[0_0_15px_rgba(245,158,11,0.4)]"
-                    : "bg-white/10 hover:bg-white/15 text-white border-white/10"
-                }`}
+                className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-xs font-semibold tracking-wide transition-all"
               >
-                <RotateCcw className="w-4 h-4" />
-                Ambil Ulang (Retake)
+                Simulasi Bayar Berhasil (Klik)
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================== */}
+      {/* ===== STEP 6: POSE READY (STANDBY BEFORE COUNTDOWN) ===== */}
+      {/* ========================================================== */}
+      <AnimatePresence>
+        {step === "pose_ready" && (
+          <motion.div
+            key="pose_ready"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="absolute inset-0 z-30 flex flex-col items-center justify-between p-8 text-center"
+          >
+            {/* Top Pose Indicator */}
+            <div className="mt-8 px-6 py-2 rounded-xl bg-[#10111c]/90 border border-[#292b3b] shadow-lg">
+              <span className="font-mono-tech text-xs text-[#f0a25c] uppercase font-bold tracking-widest">
+                POSE {currentPoseIndex + 1} DARI {selectedPkg?.poses || 3}
+              </span>
+            </div>
+
+            {/* Central Guidance */}
+            <div className="max-w-md">
+              <div className="w-16 h-16 rounded-2xl bg-[#f0a25c]/15 text-[#f0a25c] border border-[#f0a25c]/30 flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <PeaceIcon className="w-9 h-9" />
+              </div>
+
+              <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">
+                Bersiap Berpose!
+              </h2>
+              <p className="text-[#9b9eaf] text-sm leading-relaxed mb-6">
+                Beri gestur Peace ✌️ ke arah kamera atau sentuh tombol di bawah untuk memulai
+                hitung mundur 3 detik.
+              </p>
+
+              <button
+                onClick={() => setStep("countdown")}
+                className="px-8 py-3.5 bg-[#246cff] hover:bg-[#4d87ff] text-white rounded-xl font-bold text-sm uppercase tracking-wider shadow-lg shadow-[#246cff]/25 transition-all inline-flex items-center gap-2.5"
+              >
+                <Camera className="w-4 h-4" />
+                <span>Mulai Foto Sekarang (3s)</span>
+              </button>
+            </div>
+
+            <div className="h-8" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================== */}
+      {/* ===== STEP 7: COUNTDOWN & CAPTURE ======================= */}
+      {/* ========================================================== */}
+      <AnimatePresence>
+        {step === "countdown" && (
+          <motion.div
+            key="countdown"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-40 flex flex-col items-center justify-center"
+          >
+            <motion.div
+              key={photoCountdown}
+              initial={{ scale: 1.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.5, opacity: 0 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="text-8xl sm:text-9xl font-black text-white font-mono-tech drop-shadow-[0_0_40px_rgba(240,162,92,0.6)]"
+            >
+              {photoCountdown > 0 ? photoCountdown : "SMILE!"}
+            </motion.div>
+
+            <span className="font-mono-tech text-xs text-[#f0a25c] tracking-widest uppercase mt-4">
+              POSE {currentPoseIndex + 1} DARI {selectedPkg?.poses || 3}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================== */}
+      {/* ===== STEP 8: PREVIEW / RETAKE ========================== */}
+      {/* ========================================================== */}
+      <AnimatePresence>
+        {step === "preview_retake" && (
+          <motion.div
+            key="preview_retake"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="absolute inset-0 z-30 flex flex-col items-center justify-between p-6 sm:p-10 text-center"
+          >
+            <div className="mt-4">
+              <h2 className="text-3xl font-bold text-white tracking-tight">
+                Preview Hasil Foto
+              </h2>
+              <p className="text-[#9b9eaf] text-xs sm:text-sm mt-1">
+                Periksa hasil tangkapan pose Anda. Anda dapat mengulangi jika belum puas.
+              </p>
+            </div>
+
+            {/* Captured Photos Grid */}
+            <div className="flex flex-wrap items-center justify-center gap-4 max-w-4xl w-full my-auto overflow-y-auto max-h-[55vh] p-2">
+              {capturedPhotos.map((photoUrl, idx) => (
+                <div
+                  key={idx}
+                  className="relative rounded-xl overflow-hidden border border-[#292b3b] shadow-lg w-44 sm:w-52 aspect-[4/3] bg-[#10111c]"
+                >
+                  <img
+                    src={photoUrl}
+                    alt={`Pose ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                  <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-[#090a12]/80 text-[10px] font-mono-tech text-white">
+                    Pose {idx + 1}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Actions: Retake or Confirm */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 w-full max-w-md">
+              <button
+                onClick={handleRetake}
+                className="w-full sm:w-auto px-6 py-3 bg-[#171927] hover:bg-[#202336] text-white rounded-xl border border-[#292b3b] font-semibold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2"
+              >
+                <RotateCcw className="w-4 h-4 text-rose-400" />
+                <span>Foto Ulang (Retake)</span>
               </button>
 
               <button
-                data-action-id="print"
-                onClick={() => {
-                  handleStartDriveUpload();
-                  setStep("print_confirm");
-                }}
-                disabled={selectedPhotoIndices.length === 0}
-                className={`px-8 py-3 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider transition-all shadow-xl flex items-center gap-2 disabled:opacity-50 ${
-                  hoveredPkgId === "action-print"
-                    ? "bg-emerald-400 text-obsidian-950 ring-2 ring-emerald-400/50 scale-105 shadow-[0_0_20px_rgba(16,185,129,0.5)]"
-                    : "bg-gradient-to-r from-amber-500 to-amber-600 text-obsidian-950 shadow-[0_0_20px_rgba(245,158,11,0.35)]"
-                }`}
+                onClick={handleConfirmPreview}
+                className="w-full sm:w-auto px-7 py-3 bg-[#246cff] hover:bg-[#4d87ff] text-white rounded-xl font-bold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#246cff]/25"
               >
-                <Printer className="w-4 h-4" />
-                Cetak Strip ({selectedPhotoIndices.length} Foto)
+                <Check className="w-4 h-4" />
+                <span>Lanjut Cetak & Simpan</span>
               </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ===== PRINT CONFIRMATION STEP ===== */}
+      {/* ========================================================== */}
+      {/* ===== STEP 9: PROCESSING ================================ */}
+      {/* ========================================================== */}
       <AnimatePresence>
-        {step === "print_confirm" && (
+        {step === "processing" && (
           <motion.div
-            key="print_confirm"
+            key="processing"
             initial={{ opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.92 }}
             className="absolute inset-0 z-40 flex items-center justify-center p-4"
           >
-            <div className="glass-midnight rounded-2xl p-8 max-w-lg w-full text-center border border-white/15 shadow-[0_0_60px_rgba(0,0,0,0.8)]">
-              <div className="w-14 h-14 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-400/30 flex items-center justify-center mx-auto mb-4 shadow-[0_0_20px_rgba(245,158,11,0.2)]">
-                <Printer className="w-7 h-7" />
+            <div className="bg-[#10111c] rounded-2xl p-8 max-w-sm w-full text-center border border-[#292b3b] shadow-2xl">
+              <div className="w-14 h-14 rounded-2xl bg-[#f0a25c]/15 text-[#f0a25c] border border-[#f0a25c]/30 flex items-center justify-center mx-auto mb-4">
+                <Layers className="w-7 h-7 animate-pulse" />
               </div>
 
-              <h3 className="text-2xl font-extrabold text-white font-display mb-1.5">
-                Konfirmasi Cetak Hardcopy
+              <h3 className="text-xl font-bold text-white mb-1">
+                Merangkai Foto HD 300 DPI
               </h3>
-              <p className="text-zinc-300 text-sm mb-6 font-light">
-                Cetak {selectedPhotoIndices.length} pose terpilih ke mesin printer sekarang?
+              <p className="text-xs text-[#9b9eaf] mb-5">
+                Menerapkan template {selectedTheme.name} & resolusi cetak studio...
               </p>
 
-              {/* Dual Visual Gesture Cards */}
-              <div className="grid grid-cols-2 gap-4 mb-6 text-left">
-                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col justify-between">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-500 text-obsidian-950 flex items-center justify-center font-bold">
-                      <ThumbsUp className="w-4 h-4" />
-                    </div>
-                    <span className="text-emerald-300 font-display font-extrabold text-xs tracking-wider uppercase">
-                      Lanjut Cetak
-                    </span>
-                  </div>
-                  <span className="font-mono-tech text-[11px] text-zinc-300">
-                    👍 Jempol Ke Atas
-                  </span>
-                </div>
-
-                <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 flex flex-col justify-between">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-7 h-7 rounded-lg bg-rose-500 text-white flex items-center justify-center font-bold">
-                      <ThumbsDown className="w-4 h-4" />
-                    </div>
-                    <span className="text-rose-300 font-display font-extrabold text-xs tracking-wider uppercase">
-                      Ganti Foto
-                    </span>
-                  </div>
-                  <span className="font-mono-tech text-[11px] text-zinc-300">
-                    👎 Jempol Ke Bawah
-                  </span>
-                </div>
+              {/* Progress Bar */}
+              <div className="w-full bg-[#090a12] h-2 rounded-full overflow-hidden mb-2">
+                <div
+                  className="bg-[#f0a25c] h-full transition-all duration-300"
+                  style={{ width: `${processProgress}%` }}
+                />
               </div>
 
-              <div className="flex gap-3.5">
-                <button
-                  onClick={() => setStep("select_photos")}
-                  className="flex-1 py-3 bg-white/10 hover:bg-white/15 text-zinc-300 rounded-xl font-display font-bold text-xs uppercase tracking-wider transition-all border border-white/10 flex items-center justify-center gap-2"
-                >
-                  <ThumbsDown className="w-4 h-4 text-rose-400" />
-                  Batal (Manual)
-                </button>
-
-                <button
-                  onClick={() => {
-                    handleStartDriveUpload();
-                    setStep("email_input");
-                  }}
-                  className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-obsidian-950 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(16,185,129,0.35)] flex items-center justify-center gap-2"
-                >
-                  <ThumbsUp className="w-4 h-4" />
-                  Lanjut Cetak (Manual)
-                </button>
-              </div>
+              <span className="font-mono-tech text-xs text-[#f0a25c] font-bold">
+                {processProgress}% SELESAI
+              </span>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ===== EMAIL INPUT STEP ===== */}
+      {/* ========================================================== */}
+      {/* ===== STEP 10: PRINT SESSION ============================ */}
+      {/* ========================================================== */}
       <AnimatePresence>
-        {step === "email_input" && (
+        {step === "print_session" && (
           <motion.div
-            key="email_input"
-            initial={{ opacity: 0, scale: 0.92 }}
+            key="print_session"
+            initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.92 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="absolute inset-0 z-30 flex flex-col items-center justify-between p-6 sm:p-10 text-center"
+          >
+            <div className="mt-4">
+              <h2 className="text-3xl font-bold text-white tracking-tight">
+                Cetak Foto Fisik
+              </h2>
+              <p className="text-[#9b9eaf] text-xs sm:text-sm mt-1">
+                Siapkan cetakan fisik berkualitas laboratorium studio
+              </p>
+            </div>
+
+            {/* Assembled Photostrip Preview */}
+            <div className="max-w-xs w-full my-auto p-3 bg-[#10111c] rounded-2xl border border-[#292b3b] shadow-2xl">
+              {photostripBase64Ref.current && (
+                <div className="relative rounded-xl overflow-hidden shadow-md max-h-72 flex justify-center">
+                  <img
+                    src={photostripBase64Ref.current}
+                    alt="Assembled Strip"
+                    className="max-h-72 object-contain"
+                  />
+                  {isPrinting && (
+                    <motion.div
+                      initial={{ top: "0%" }}
+                      animate={{ top: "100%" }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                      className="absolute left-0 right-0 h-1 bg-[#f0a25c] shadow-[0_0_12px_#f0a25c]"
+                    />
+                  )}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#292b3b] text-xs">
+                <span className="text-[#9b9eaf]">Jumlah Cetak:</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPrintCopies(Math.max(1, printCopies - 1))}
+                    className="w-6 h-6 rounded bg-[#171927] border border-[#292b3b] text-white flex items-center justify-center font-bold"
+                  >
+                    -
+                  </button>
+                  <span className="font-bold text-white font-mono-tech">{printCopies}</span>
+                  <button
+                    onClick={() => setPrintCopies(printCopies + 1)}
+                    className="w-6 h-6 rounded bg-[#171927] border border-[#292b3b] text-white flex items-center justify-center font-bold"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Print Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 w-full max-w-md">
+              <button
+                disabled={isPrinting}
+                onClick={handleSimulatePrint}
+                className="w-full sm:w-auto px-7 py-3 bg-[#f0a25c] hover:bg-[#ff7b00] text-[#090a12] rounded-xl font-bold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2 shadow-lg"
+              >
+                <Printer className="w-4 h-4" />
+                <span>{isPrinting ? "Mencetak Foto..." : `Cetak ${printCopies} Lembar`}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  handleStartDriveUpload();
+                  setStep("upload_digital");
+                }}
+                className="w-full sm:w-auto px-6 py-3 bg-[#171927] hover:bg-[#202336] text-white rounded-xl border border-[#292b3b] font-semibold text-xs tracking-wider uppercase transition-all"
+              >
+                Lewati Cetak Fisik ➔
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================== */}
+      {/* ===== STEP 11: UPLOAD DIGITAL (EMAIL + DRIVE) ============ */}
+      {/* ========================================================== */}
+      <AnimatePresence>
+        {step === "upload_digital" && (
+          <motion.div
+            key="upload_digital"
+            initial={{ opacity: 0, scale: 0.94 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.94 }}
             className="absolute inset-0 z-40 flex items-center justify-center p-4"
           >
-            <div className="glass-midnight rounded-2xl p-8 max-w-md w-full text-center border border-white/15 shadow-[0_0_60px_rgba(0,0,0,0.8)]">
-              <div className="w-14 h-14 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-400/30 flex items-center justify-center mx-auto mb-4 shadow-[0_0_20px_rgba(245,158,11,0.2)]">
-                <Mail className="w-7 h-7" />
+            <div className="bg-[#10111c] rounded-2xl p-7 max-w-md w-full text-center border border-[#292b3b] shadow-2xl">
+              <div className="w-12 h-12 rounded-xl bg-[#246cff]/15 text-[#246cff] border border-[#246cff]/30 flex items-center justify-center mx-auto mb-3">
+                <Mail className="w-6 h-6" />
               </div>
 
-              <h3 className="text-2xl font-extrabold text-white font-display mb-1.5">
-                Kirim Soft Copy HD
+              <h3 className="text-xl font-bold text-white mb-1">
+                Kirim File HD ke Email Anda
               </h3>
-              <p className="font-mono-tech text-zinc-400 text-xs tracking-wider uppercase mb-5">
-                Ucapkan atau ketik alamat email Anda
+              <p className="text-xs text-[#9b9eaf] mb-5">
+                Masukkan email Anda atau gunakan suara (Kepal tangan ✊ untuk bicara)
               </p>
 
-              {/* Voice Gesture Guide */}
-              <div className="p-4 rounded-xl bg-obsidian-900/80 border border-white/10 mb-5 text-left space-y-2">
-                <div className="flex items-center justify-between text-xs text-zinc-200">
-                  <span className="font-semibold flex items-center gap-2">
-                    <span className="text-base">✊</span> Mengepal: Mulai Rekam
-                  </span>
-                  <span className="font-mono-tech text-amber-400 text-[10px] font-bold">VOICE-INPUT</span>
-                </div>
-                <div className="flex items-center justify-between text-xs text-zinc-300 border-t border-white/10 pt-2">
-                  <span className="font-semibold flex items-center gap-2">
-                    <span className="text-base">🖐️</span> Terbuka: Stop Rekam
-                  </span>
-                </div>
-
-                {isRecordingVoice && (
-                  <div className="flex items-center justify-center gap-1.5 py-2.5 border-t border-white/10">
-                    {[0.2, 0.5, 0.8, 0.4, 0.9, 0.3, 0.7, 0.4].map((h, i) => (
-                      <motion.div
-                        key={i}
-                        animate={{ height: ["6px", "24px", "6px"] }}
-                        transition={{
-                          duration: 0.6 + h * 0.4,
-                          repeat: Infinity,
-                          ease: "easeInOut",
-                          delay: i * 0.08,
-                        }}
-                        className="w-1 bg-amber-400 rounded-full shadow-[0_0_6px_#f59e0b]"
-                      />
-                    ))}
-                    <span className="ml-3 font-mono-tech text-amber-400 text-xs font-bold animate-pulse">
-                      LISTENING...
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Email Text Input Field */}
-              <div className="relative mb-5">
+              <div className="relative mb-4">
                 <input
                   type="email"
                   value={emailInput}
                   onChange={(e) => setEmailInput(e.target.value)}
-                  placeholder="contoh: user@gmail.com"
-                  className="w-full px-4 py-3 bg-obsidian-900/90 border border-white/10 rounded-xl text-white placeholder:text-zinc-600 focus:outline-none focus:border-amber-400 font-mono-tech text-sm font-medium"
+                  placeholder="contoh@gmail.com"
+                  className="w-full px-4 py-3 bg-[#090a12] border border-[#292b3b] rounded-xl text-white placeholder:text-[#454964] focus:outline-none focus:border-[#246cff] text-sm"
                 />
-
                 <button
+                  type="button"
                   onClick={isRecordingVoice ? stopRecordingVoice : startRecordingVoice}
-                  className={`absolute right-2 top-2 px-3 py-1 rounded-lg text-xs font-mono-tech font-bold flex items-center gap-1.5 transition-all ${
-                    isRecordingVoice
-                      ? "bg-rose-500 text-white animate-pulse"
-                      : "bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/30"
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-colors ${
+                    isRecordingVoice ? "bg-rose-500 text-white" : "text-[#9b9eaf] hover:text-white"
                   }`}
+                  title="Voice Input Email"
                 >
-                  {isRecordingVoice ? (
-                    <>
-                      <MicOff className="w-3.5 h-3.5" />
-                      Stop
-                    </>
-                  ) : (
-                    <>
-                      <Mic className="w-3.5 h-3.5" />
-                      Bicara
-                    </>
-                  )}
+                  {isRecordingVoice ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                 </button>
               </div>
 
-              {/* Submit Buttons */}
-              <div className="flex gap-3.5">
+              {isRecordingVoice && (
+                <p className="text-[11px] text-[#f0a25c] mb-3 animate-pulse">
+                  Mendengarkan... Ucapkan alamat email Anda dengan jelas
+                </p>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-2.5">
                 <button
-                  onClick={() => handleSendEmailAndFinish("")}
-                  className="flex-1 py-3 bg-white/10 hover:bg-white/15 text-zinc-300 rounded-xl font-display font-bold text-xs uppercase tracking-wider transition-all border border-white/10"
+                  onClick={() => setStep("qr_download")}
+                  className="flex-1 py-3 bg-[#171927] hover:bg-[#202336] text-[#9b9eaf] hover:text-white rounded-xl text-xs font-semibold uppercase tracking-wider border border-[#292b3b] transition-all"
                 >
                   Lewati Email
                 </button>
 
                 <button
-                  onClick={() => handleSendEmailAndFinish(emailInput)}
-                  className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-obsidian-950 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(245,158,11,0.35)] flex items-center justify-center gap-2"
+                  onClick={() => {
+                    handleSendEmail(emailInput);
+                    setStep("qr_download");
+                  }}
+                  className="flex-1 py-3 bg-[#246cff] hover:bg-[#4d87ff] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-md shadow-[#246cff]/25"
                 >
-                  <ThumbsUp className="w-4 h-4" />
-                  Kirim & Selesai (👍)
+                  Kirim & Download
                 </button>
               </div>
             </div>
@@ -1876,186 +2051,137 @@ export default function BoothPage() {
         )}
       </AnimatePresence>
 
-      {/* ===== FINAL QR CODE DOWNLOAD STEP ===== */}
+      {/* ========================================================== */}
+      {/* ===== STEP 12: QR DOWNLOAD ============================== */}
+      {/* ========================================================== */}
       <AnimatePresence>
         {step === "qr_download" && (
           <motion.div
             key="qr_download"
-            initial={{ opacity: 0, scale: 0.92 }}
+            initial={{ opacity: 0, scale: 0.94 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.92 }}
+            exit={{ opacity: 0, scale: 0.94 }}
             className="absolute inset-0 z-40 flex items-center justify-center p-4"
           >
-            <div className="glass-midnight rounded-2xl p-8 max-w-sm w-full text-center border border-amber-400/30 shadow-[0_0_60px_rgba(0,0,0,0.8)]">
-              <div className="w-14 h-14 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-400/30 flex items-center justify-center mx-auto mb-4 shadow-[0_0_20px_rgba(245,158,11,0.2)]">
-                <Download className="w-7 h-7" />
+            <div className="bg-[#10111c] rounded-2xl p-7 max-w-sm w-full text-center border border-[#292b3b] shadow-2xl">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto mb-3">
+                <Download className="w-6 h-6" />
               </div>
 
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-display mb-1">
-                Unduh Foto Digital HD
-              </h2>
-              <p className="font-mono-tech text-zinc-400 text-[11px] tracking-wider uppercase mb-4">
-                Scan QR Code di bawah dengan smartphone
+              <h3 className="text-xl font-bold text-white mb-1">
+                Scan Untuk Download
+              </h3>
+              <p className="text-xs text-[#9b9eaf] mb-4">
+                Buka kamera HP Anda dan scan QR Code di bawah untuk menyimpan seluruh file foto HD
               </p>
 
-              {/* Holographic QR Pod with Mustard Scanline */}
-              {isUploading ? (
-                <div className="py-6 text-center space-y-3">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="w-10 h-10 border-3 border-amber-400 border-t-transparent rounded-full mx-auto"
-                  />
-                  <p className="font-mono-tech text-xs text-amber-400 font-bold uppercase tracking-wider animate-pulse">
-                    SYNCING GOOGLE DRIVE...
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div className="bg-white p-4 rounded-xl shadow-2xl border border-white/20 inline-block mb-3.5 relative overflow-hidden group">
-                    <div className="absolute left-0 right-0 h-0.5 bg-amber-400 shadow-[0_0_10px_#f59e0b] animate-scanline-mustard z-10 pointer-events-none" />
-
-                    <QRCodeSVG
-                      value={driveFolderUrl || (typeof window !== "undefined" ? window.location.href : "https://ai-box.id")}
-                      size={175}
-                      className="mx-auto"
-                    />
-                    <span className="text-obsidian-950 font-mono-tech font-extrabold text-[10px] block mt-1.5 tracking-widest uppercase">
-                      {driveFolderName || "Google Drive Public Folder"}
-                    </span>
-                  </div>
-
-                  {driveFolderUrl && (
-                    <div className="mb-3">
-                      <a
-                        href={driveFolderUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-block px-3.5 py-1.5 bg-white/10 hover:bg-white/20 border border-white/15 text-amber-300 rounded-lg font-mono-tech font-bold text-[11px] tracking-wider uppercase transition-all"
-                      >
-                        📂 Buka Google Drive Folder
-                      </a>
-                    </div>
-                  )}
-                </>
-              )}
-
-              <div className="bg-emerald-500/10 border border-emerald-400/30 rounded-lg py-2 px-3.5 mb-3.5">
-                <span className="font-mono-tech text-emerald-300 text-xs font-bold uppercase tracking-wider">
-                  Foto Sedang Dicetak di Printer 🖨️
-                </span>
-              </div>
-
-              {/* Auto Reset Countdown */}
-              <div className="flex items-center justify-center gap-2 font-mono-tech text-zinc-400 text-xs">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  className="w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full"
+              <div className="bg-white p-3.5 rounded-xl inline-block mb-3 shadow-inner">
+                <QRCodeSVG
+                  value={driveFolderUrl || "https://drive.google.com"}
+                  size={160}
+                  level="H"
                 />
-                <span>Reset Standby dalam {qrTimer}s...</span>
               </div>
+
+              <p className="font-mono-tech text-[10px] text-[#9b9eaf] mb-4">
+                File otomatis tersimpan di Google Drive Vault
+              </p>
+
+              <div className="flex items-center justify-center gap-2 font-mono-tech text-xs text-[#f0a25c] mb-4">
+                <span>Auto-Reset Dalam {qrTimer}s</span>
+              </div>
+
+              <button
+                onClick={() => setStep("thank_you")}
+                className="w-full py-3 bg-[#246cff] hover:bg-[#4d87ff] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-md shadow-[#246cff]/25"
+              >
+                Selesai & Ambil Foto ➔
+              </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ===== HIDDEN ADMIN ESCAPE (Bottom Right) ===== */}
-      <button
-        onClick={handleHiddenTap}
-        className="absolute bottom-4 right-4 w-16 h-16 z-50 opacity-0 cursor-pointer"
-        aria-label="Hidden admin button"
-      />
+      {/* ========================================================== */}
+      {/* ===== STEP 13: THANK YOU / RESET ======================== */}
+      {/* ========================================================== */}
+      <AnimatePresence>
+        {step === "thank_you" && (
+          <motion.div
+            key="thank_you"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="absolute inset-0 z-40 flex items-center justify-center p-4 text-center"
+          >
+            <div className="bg-[#10111c] rounded-2xl p-9 max-w-md w-full border border-[#292b3b] shadow-2xl">
+              <motion.div
+                animate={{ scale: [1, 1.15, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                className="w-16 h-16 rounded-2xl bg-rose-500/15 text-rose-400 border border-rose-500/30 flex items-center justify-center mx-auto mb-4"
+              >
+                <Heart className="w-8 h-8 fill-rose-400" />
+              </motion.div>
 
-      {/* ===== ADMIN LOGOUT DIALOG (MIDNIGHT MODAL) ===== */}
+              <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">
+                Terima Kasih!
+              </h2>
+              <p className="text-sm text-[#9b9eaf] leading-relaxed mb-6">
+                Terima kasih telah berfoto di AI Box Photobooth. Jangan lupa ambil hasil cetak Anda
+                di slot mesin printer!
+              </p>
+
+              <button
+                onClick={handleResetToIdle}
+                className="w-full py-3 bg-[#f0a25c] hover:bg-[#ff7b00] text-[#090a12] rounded-xl font-bold text-xs uppercase tracking-wider transition-all"
+              >
+                Mulai Sesi Baru ({thankYouTimer}s)
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================== */}
+      {/* ===== HIDDEN ADMIN DIALOG =============================== */}
+      {/* ========================================================== */}
       <AnimatePresence>
         {showAdminDialog && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+            className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
           >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="glass-midnight rounded-2xl p-7 max-w-sm w-full shadow-2xl border border-white/15 text-white"
-            >
-              <div className="flex items-center gap-3 mb-5">
-                <Logo size="sm" variant="rounded" animated={false} />
-                <div>
-                  <h3 className="font-display font-extrabold text-white text-lg">
-                    Admin Logout
-                  </h3>
-                  <p className="font-mono-tech text-zinc-400 text-xs uppercase tracking-wider">
-                    Masukkan password admin
-                  </p>
-                </div>
-              </div>
-
+            <div className="bg-[#10111c] rounded-2xl p-6 max-w-xs w-full border border-[#292b3b] text-center shadow-2xl">
+              <ShieldCheck className="w-8 h-8 text-[#f0a25c] mx-auto mb-2" />
+              <h3 className="text-lg font-bold text-white mb-3">Admin Console Exit</h3>
               <input
                 type="password"
                 value={adminPassword}
                 onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder="Password admin"
-                onKeyDown={(e) => e.key === "Enter" && handleAdminLogout()}
-                className="w-full px-3.5 py-2.5 bg-obsidian-900/90 border border-white/10 rounded-xl text-white placeholder:text-zinc-600 focus:outline-none focus:border-amber-400 font-mono-tech text-sm mb-3.5"
-                autoFocus
+                placeholder="Masukkan Password"
+                className="w-full px-3 py-2 bg-[#090a12] border border-[#292b3b] rounded-xl text-white text-sm mb-3 text-center focus:outline-none focus:border-[#246cff]"
               />
-
-              {adminError && (
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-rose-400 font-mono-tech text-xs mb-3"
-                >
-                  {adminError}
-                </motion.p>
-              )}
-
-              <div className="flex gap-3">
+              {adminError && <p className="text-xs text-rose-400 mb-2">{adminError}</p>}
+              <div className="flex gap-2">
                 <button
                   onClick={() => {
                     setShowAdminDialog(false);
                     setAdminPassword("");
-                    setAdminError("");
                   }}
-                  className="flex-1 py-2.5 bg-white/10 text-zinc-300 rounded-xl font-display font-bold text-xs uppercase tracking-wider hover:bg-white/15 transition-colors"
+                  className="flex-1 py-2 bg-[#171927] text-[#9b9eaf] rounded-xl text-xs font-semibold"
                 >
                   Batal
                 </button>
                 <button
                   onClick={handleAdminLogout}
-                  className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-display font-extrabold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-lg shadow-rose-500/30"
+                  className="flex-1 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold"
                 >
-                  <LogOut className="w-4 h-4" />
                   Logout
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ===== LOADING STATE ===== */}
-      <AnimatePresence>
-        {!cameraReady && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-dark"
-          >
-            <Logo size="lg" variant="splash" animated />
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-              className="w-12 h-12 border-4 border-sky-400/20 border-t-sky-400 rounded-full my-6"
-            />
-            <p className="text-white/80 text-lg font-medium">
-              Mengakses Kamera & Sensor Gestur...
-            </p>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
