@@ -30,8 +30,8 @@ export class MediaPipeManager {
   private lastGesture: GestureType = "none";
   private gestureStableCount: number = 0;
   private onGestureCallback: ((gesture: GestureResult) => void) | null = null;
-  private targetFPS: number = 15;
-  private frameInterval: number = 1000 / 15;
+  private targetFPS: number = 30;
+  private frameInterval: number = 1000 / 30;
   private lastFrameTime: number = 0;
   private videoRef: HTMLVideoElement | null = null;
 
@@ -47,8 +47,8 @@ export class MediaPipeManager {
         delegate: "GPU",
       },
       runningMode: "VIDEO",
-      numHands: 2,
-      minHandDetectionConfidence: 0.6,
+      numHands: 1,
+      minHandDetectionConfidence: 0.55,
       minTrackingConfidence: 0.5,
     });
     return manager;
@@ -156,6 +156,18 @@ export class MediaPipeManager {
             landmarks,
             handedness,
             confidence: result.handedness?.[0]?.[0]?.score ?? 0,
+          });
+        }
+      } else {
+        // Hand lost or offscreen: immediately notify callback so skeleton is wiped
+        this.lastGesture = "none";
+        this.gestureStableCount = 0;
+        if (this.onGestureCallback) {
+          this.onGestureCallback({
+            gesture: "none",
+            landmarks: [],
+            handedness: "Right",
+            confidence: 0,
           });
         }
       }
@@ -302,12 +314,15 @@ export function drawHandSkeleton(
   landmarks: NormalizedLandmark[],
   width: number,
   height: number,
-  gestureName: string = ""
+  _gestureName: string = ""
 ): void {
-  if (!landmarks || landmarks.length < 21) return;
-
   ctx.save();
   ctx.clearRect(0, 0, width, height);
+
+  if (!landmarks || landmarks.length < 21) {
+    ctx.restore();
+    return;
+  }
 
   const connections = [
     [0, 1], [0, 5], [5, 9], [9, 13], [13, 17], [0, 17],
@@ -378,23 +393,6 @@ export function drawHandSkeleton(
       ctx.stroke();
     }
   });
-
-  // Optional debug banner
-  if (gestureName) {
-    const boxWidth = 240;
-    const boxHeight = 32;
-    const boxX = width - boxWidth - 16;
-    const boxY = 16;
-
-    ctx.shadowBlur = 0;
-    ctx.font = "bold 12px monospace";
-    ctx.fillStyle = "rgba(9, 10, 18, 0.85)";
-    ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
-    ctx.strokeStyle = "#f0a25c";
-    ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
-    ctx.fillStyle = "#f0a25c";
-    ctx.fillText(`GESTURE: ${gestureName}`, boxX + 12, boxY + 20);
-  }
 
   ctx.restore();
 }

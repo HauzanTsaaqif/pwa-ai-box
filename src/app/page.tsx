@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useState, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
   Camera,
@@ -18,13 +18,66 @@ import Logo from "@/components/Logo";
 
 export default function LandingPage() {
   const [mounted, setMounted] = useState(false);
+  const [cameraFlash, setCameraFlash] = useState(false);
+  const [boxFlash, setBoxFlash] = useState(false);
+  const [isFocusing, setIsFocusing] = useState(false);
+  const [flashTriggered, setFlashTriggered] = useState(false);
+  const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const cooldownRef = useRef(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  const handleMouseEnterText = () => {
+    if (cooldownRef.current) return;
+    setIsFocusing(true);
+    setFlashTriggered(false);
+
+    // Delayed shutter snap (0.5s after keeping cursor inside the text box)
+    hoverTimerRef.current = setTimeout(() => {
+      setIsFocusing(false);
+      setFlashTriggered(true);
+      setBoxFlash(true);
+      setCameraFlash(true);
+      cooldownRef.current = true;
+
+      setTimeout(() => {
+        setBoxFlash(false);
+        setCameraFlash(false);
+      }, 260);
+
+      // Cooldown before next hover trigger
+      setTimeout(() => {
+        cooldownRef.current = false;
+        setFlashTriggered(false);
+      }, 1600);
+    }, 500);
+  };
+
+  const handleMouseLeaveText = () => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setIsFocusing(false);
+  };
+
   return (
-    <div className="min-h-screen bg-[#090a12] text-[#f7f7fb] selection:bg-[#ff7b00] selection:text-white font-sans">
+    <div className="min-h-screen bg-[#090a12] text-[#f7f7fb] selection:bg-[#ff7b00] selection:text-white font-sans relative">
+      {/* Interactive Camera Shutter Flash (Jepretan Kamera) Strobe */}
+      <AnimatePresence>
+        {cameraFlash && (
+          <motion.div
+            initial={{ opacity: 0.9 }}
+            animate={{ opacity: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="fixed inset-0 bg-white z-[9999] pointer-events-none"
+          />
+        )}
+      </AnimatePresence>
+
       {/* ===== HEADER NAVIGATION ===== */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#090a12]/90 border-b border-[#292b3b] backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-18 flex items-center justify-between">
@@ -41,8 +94,8 @@ export default function LandingPage() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-8 text-xs font-medium text-[#9b9eaf]">
-            <a href="#fitur" className="hover:text-white transition-colors">
-              Fitur
+            <a href="#demo" className="hover:text-white transition-colors">
+              Demo
             </a>
             <a href="#cara-kerja" className="hover:text-white transition-colors">
               Cara Kerja
@@ -60,7 +113,7 @@ export default function LandingPage() {
                 className="px-4 py-2 bg-[#246cff] hover:bg-[#4d87ff] text-white rounded-xl text-xs font-semibold tracking-wide transition-all flex items-center gap-2 shadow-[0_4px_16px_rgba(36,108,255,0.3)]"
               >
                 <Camera className="w-3.5 h-3.5" />
-                <span>Masuk Kiosk</span>
+                <span>Mulai AIBOX</span>
               </motion.button>
             </Link>
           </div>
@@ -74,27 +127,76 @@ export default function LandingPage() {
           <div className="absolute top-16 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-gradient-to-b from-[#2e3247]/30 to-transparent rounded-full blur-[120px] pointer-events-none" />
         )}
 
-        {/* Section Kicker */}
+        {/* Main Headline with Camera Shutter Viewfinder and Delayed Hover Strobe Snap */}
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#ff7b00]/10 border border-[#ff7b00]/25 text-[#f0a25c] text-xs font-semibold tracking-wider uppercase mb-6"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-[#ff7b00]" />
-          <span>AI-Powered Photo Experience</span>
-        </motion.div>
-
-        {/* Main Headline with exact compro phrasing and typography */}
-        <motion.h1
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.1 }}
-          className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-[-0.06em] text-white leading-[0.96] max-w-4xl mx-auto mb-6"
+          onMouseEnter={handleMouseEnterText}
+          onMouseLeave={handleMouseLeaveText}
+          className={`relative inline-block max-w-4xl mx-auto mb-6 px-6 sm:px-12 py-8 rounded-2xl transition-all duration-300 cursor-pointer overflow-hidden ${isFocusing
+            ? "bg-[#10111c]/60 ring-1 ring-[#f0a25c]/50 scale-[0.995]"
+            : flashTriggered
+              ? "bg-[#10111c]/80 ring-2 ring-[#246cff] shadow-[0_0_50px_rgba(36,108,255,0.35)]"
+              : "hover:bg-[#10111c]/40"
+            }`}
         >
-          Capture Your Essence,<br />
-          <span className="text-[#f0a25c]">Elevated by aibox.</span>
-        </motion.h1>
+          {/* Box Flash Xenon Strobe Overlay */}
+          <AnimatePresence>
+            {boxFlash && (
+              <motion.div
+                initial={{ opacity: 1 }}
+                animate={{ opacity: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.32, ease: "easeOut" }}
+                className="absolute inset-0 bg-white z-30 pointer-events-none mix-blend-screen shadow-[0_0_80px_rgba(255,255,255,0.9)]"
+              />
+            )}
+          </AnimatePresence>
+
+          {/* Viewfinder Reticle Corner Brackets that snap tightly inward on focus */}
+          <div
+            className={`absolute top-2 left-2 w-6 h-6 border-t-2 border-l-2 transition-all duration-300 pointer-events-none ${isFocusing
+              ? "border-[#f0a25c] w-8 h-8 scale-90"
+              : flashTriggered
+                ? "border-[#246cff] w-8 h-8 drop-shadow-[0_0_10px_#246cff]"
+                : "border-[#f0a25c]/40"
+              }`}
+          />
+          <div
+            className={`absolute top-2 right-2 w-6 h-6 border-t-2 border-r-2 transition-all duration-300 pointer-events-none ${isFocusing
+              ? "border-[#f0a25c] w-8 h-8 scale-90"
+              : flashTriggered
+                ? "border-[#246cff] w-8 h-8 drop-shadow-[0_0_10px_#246cff]"
+                : "border-[#f0a25c]/40"
+              }`}
+          />
+          <div
+            className={`absolute bottom-2 left-2 w-6 h-6 border-b-2 border-l-2 transition-all duration-300 pointer-events-none ${isFocusing
+              ? "border-[#f0a25c] w-8 h-8 scale-90"
+              : flashTriggered
+                ? "border-[#246cff] w-8 h-8 drop-shadow-[0_0_10px_#246cff]"
+                : "border-[#f0a25c]/40"
+              }`}
+          />
+          <div
+            className={`absolute bottom-2 right-2 w-6 h-6 border-b-2 border-r-2 transition-all duration-300 pointer-events-none ${isFocusing
+              ? "border-[#f0a25c] w-8 h-8 scale-90"
+              : flashTriggered
+                ? "border-[#246cff] w-8 h-8 drop-shadow-[0_0_10px_#246cff]"
+                : "border-[#f0a25c]/40"
+              }`}
+          />
+
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-[-0.06em] text-white leading-[0.96] select-none">
+            <span className="block drop-shadow-[0_4px_25px_rgba(0,0,0,0.8)]">
+              Capture Your Essence,
+            </span>
+            <span className="block mt-2 bg-gradient-to-r from-[#f0a25c] via-[#ffeed6] to-[#f0a25c] bg-clip-text text-transparent bg-[length:200%_auto] hover:opacity-95 transition-all drop-shadow-[0_2px_15px_rgba(240,162,92,0.3)]">
+              Elevated by aibox.
+            </span>
+          </h1>
+        </motion.div>
 
         {/* Subtitle */}
         <motion.p
@@ -121,7 +223,7 @@ export default function LandingPage() {
               className="w-full sm:w-auto px-7 py-3.5 bg-[#246cff] hover:bg-[#4d87ff] text-white rounded-xl text-sm font-semibold tracking-tight shadow-[0_10px_25px_rgba(36,108,255,0.25)] transition-all flex items-center justify-center gap-2.5"
             >
               <Camera className="w-4 h-4" />
-              <span>Mulai Kiosk Photobooth</span>
+              <span>Mulai AIBOX</span>
               <ArrowRight className="w-4 h-4" />
             </motion.button>
           </Link>
@@ -171,10 +273,11 @@ export default function LandingPage() {
 
         {/* Live Kiosk Dual Demo: model_a.mp4 & model_b.mp4 side-by-side with ui-box.png overlay */}
         <motion.div
+          id="demo"
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.5 }}
-          className="w-full max-w-6xl mt-16 text-left"
+          className="w-full max-w-6xl mt-16 text-left scroll-mt-24"
         >
           {/* Showcase Section Heading */}
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6 pb-4 border-b border-[#292b3b]">
@@ -184,10 +287,10 @@ export default function LandingPage() {
                 Dual Interactive PV Demonstration
               </div>
               <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-                Live Demonstration // Kiosk In Action
+                Live Demonstration
               </h3>
               <p className="text-xs sm:text-sm text-[#9b9eaf] mt-1 max-w-xl">
-                Pengalaman photobooth touchless mutakhir: deteksi gestur tangan presisi tinggi dan pemrosesan multi-pose instan dalam satu perangkat mandiri.
+                Pengalaman photobooth touchless dengan deteksi gestur tangan presisi tinggi dan pemrosesan multi-pose instan.
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -211,7 +314,7 @@ export default function LandingPage() {
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-[#f0a25c] animate-pulse" />
                     <span className="font-mono-tech text-xs font-semibold text-white tracking-wide uppercase">
-                      LIVE DEMO A // GESTURE CAPTURE
+                      LIVE DEMO
                     </span>
                   </div>
                   <span className="font-mono-tech text-[10px] text-[#f0a25c] bg-[#f0a25c]/10 border border-[#f0a25c]/25 px-2 py-0.5 rounded tracking-wider uppercase">
@@ -234,11 +337,6 @@ export default function LandingPage() {
                     alt="AI Box Kiosk Interface A"
                     className="absolute inset-0 w-full h-full object-cover pointer-events-none z-10"
                   />
-                  {/* Subtle Corner HUD badge */}
-                  <div className="absolute top-2.5 right-2.5 z-20 pointer-events-none flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded border border-white/10 font-mono-tech text-[9px] text-white/90">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                    FEED 01
-                  </div>
                 </div>
 
                 {/* Selling Copy & Specs */}
@@ -275,7 +373,7 @@ export default function LandingPage() {
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-[#246cff] animate-pulse" />
                     <span className="font-mono-tech text-xs font-semibold text-white tracking-wide uppercase">
-                      LIVE DEMO B // MULTI-POSE SESSION
+                      LIVE DEMO
                     </span>
                   </div>
                   <span className="font-mono-tech text-[10px] text-[#246cff] bg-[#246cff]/10 border border-[#246cff]/25 px-2 py-0.5 rounded tracking-wider uppercase">
@@ -298,11 +396,6 @@ export default function LandingPage() {
                     alt="AI Box Kiosk Interface B"
                     className="absolute inset-0 w-full h-full object-cover pointer-events-none z-10"
                   />
-                  {/* Subtle Corner HUD badge */}
-                  <div className="absolute top-2.5 right-2.5 z-20 pointer-events-none flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded border border-white/10 font-mono-tech text-[9px] text-white/90">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                    FEED 02
-                  </div>
                 </div>
 
                 {/* Selling Copy & Specs */}
@@ -320,7 +413,7 @@ export default function LandingPage() {
               {/* Badges / Micro Specs */}
               <div className="mt-4 pt-3.5 border-t border-[#292b3b]/70 flex flex-wrap items-center gap-2 font-mono-tech text-[10px]">
                 <span className="px-2.5 py-1 rounded bg-[#090a12] border border-[#292b3b] text-[#cbd0e1]">
-                  Auto Flash Sync
+                  Auto Flash
                 </span>
                 <span className="px-2.5 py-1 rounded bg-[#090a12] border border-[#292b3b] text-[#cbd0e1]">
                   Instant Print Spooler
@@ -354,117 +447,7 @@ export default function LandingPage() {
         </motion.div>
       </section>
 
-      {/* ===== FEATURES SECTION ===== */}
-      <section id="fitur" className="py-24 px-4 sm:px-6 max-w-6xl mx-auto border-t border-[#292b3b]">
-        <div className="text-center mb-16">
-          <p className="text-[#ff7b00] font-mono-tech text-xs tracking-wider uppercase font-semibold mb-2">
-            Arsitektur Sistem
-          </p>
-          <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-[-0.04em] mb-4">
-            Didesain untuk Standar Tertinggi
-          </h2>
-          <p className="text-[#9b9eaf] text-sm sm:text-base max-w-xl mx-auto">
-            Kombinasi teknologi Computer Vision client-side dan compositing canvas 300 DPI
-            untuk performa kiosk 24/7 tanpa kompromi.
-          </p>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {/* Card 1: Gesture Vision */}
-          <div className="md:col-span-2 bg-[#10111c] rounded-2xl p-8 border border-[#292b3b] relative overflow-hidden flex flex-col justify-between">
-            <div>
-              <div className="w-11 h-11 rounded-xl bg-[#246cff]/10 border border-[#246cff]/20 flex items-center justify-center text-[#246cff] mb-6">
-                <Hand className="w-5 h-5" />
-              </div>
-              <h3 className="text-2xl font-bold text-white tracking-tight mb-3">
-                100% Client-Side Hand Gesture AI
-              </h3>
-              <p className="text-[#9b9eaf] text-sm leading-relaxed max-w-lg mb-6">
-                Menggunakan MediaPipe Tasks Vision berbasis WebAssembly & WebGL. Seluruh deteksi
-                landmark 21 titik tangan dieksekusi langsung di GPU perangkat kiosk pengguna.
-                Bebas latensi server dan aman secara privasi.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2 pt-4 border-t border-[#292b3b]">
-              <span className="font-mono-tech text-[10px] px-3 py-1 rounded-lg bg-[#171927] text-[#9b9eaf] border border-[#292b3b]">
-                WASM ACCELERATED
-              </span>
-              <span className="font-mono-tech text-[10px] px-3 py-1 rounded-lg bg-[#171927] text-[#9b9eaf] border border-[#292b3b]">
-                WEBGL SHADERS
-              </span>
-              <span className="font-mono-tech text-[10px] px-3 py-1 rounded-lg bg-[#171927] text-[#9b9eaf] border border-[#292b3b]">
-                ZERO SERVER DELAY
-              </span>
-            </div>
-          </div>
-
-          {/* Card 2: 300 DPI Compositing */}
-          <div className="bg-[#10111c] rounded-2xl p-8 border border-[#292b3b] flex flex-col justify-between">
-            <div>
-              <div className="w-11 h-11 rounded-xl bg-[#f0a25c]/10 border border-[#f0a25c]/25 flex items-center justify-center text-[#f0a25c] mb-6">
-                <Layers className="w-5 h-5" />
-              </div>
-              <h3 className="text-xl font-bold text-white tracking-tight mb-3">
-                Konva.js 300 DPI Compositing
-              </h3>
-              <p className="text-[#9b9eaf] text-xs leading-relaxed mb-6">
-                Penggabungan multi-frame, watermark transparan, dan branding kustom acara dilakukan
-                dengan resolusi cetak industri (300 DPI) dalam hitungan milidetik.
-              </p>
-            </div>
-            <div className="font-mono-tech text-[11px] text-[#f0a25c] font-semibold uppercase">
-              HIGH-RES PRINT READY
-            </div>
-          </div>
-
-          {/* Card 3: Instant Cloud Delivery */}
-          <div className="bg-[#10111c] rounded-2xl p-8 border border-[#292b3b] flex flex-col justify-between">
-            <div>
-              <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 mb-6">
-                <QrCode className="w-5 h-5" />
-              </div>
-              <h3 className="text-xl font-bold text-white tracking-tight mb-3">
-                Cloud Vault & QR Instant
-              </h3>
-              <p className="text-[#9b9eaf] text-xs leading-relaxed mb-6">
-                Folder Google Drive publik otomatis dibuat dengan hak akses langsung. Pengguna
-                hanya perlu scan QR Code atau menerima via email SMTP terenkripsi.
-              </p>
-            </div>
-            <div className="font-mono-tech text-[11px] text-emerald-400 font-semibold uppercase">
-              AUTO-SHARED CLOUD FOLDER
-            </div>
-          </div>
-
-          {/* Card 4: Hardware Kiosk Stability */}
-          <div className="md:col-span-2 bg-[#10111c] rounded-2xl p-8 border border-[#292b3b] flex flex-col justify-between">
-            <div>
-              <div className="w-11 h-11 rounded-xl bg-[#246cff]/10 border border-[#246cff]/20 flex items-center justify-center text-[#246cff] mb-6">
-                <Cpu className="w-5 h-5" />
-              </div>
-              <h3 className="text-2xl font-bold text-white tracking-tight mb-3">
-                Kiosk Stability 24/7 & Offline Caching
-              </h3>
-              <p className="text-[#9b9eaf] text-sm leading-relaxed max-w-lg mb-6">
-                Dilengkapi arsitektur PWA Serwist modern dan memory buffer auto-cleanup. Sistem
-                mampu beroperasi nonstop di layar sentuh, iPad, maupun booth tanpa memory
-                leak atau overheat.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2 pt-4 border-t border-[#292b3b]">
-              <span className="font-mono-tech text-[10px] px-3 py-1 rounded-lg bg-[#171927] text-[#9b9eaf] border border-[#292b3b]">
-                PWA SERVICE WORKER
-              </span>
-              <span className="font-mono-tech text-[10px] px-3 py-1 rounded-lg bg-[#171927] text-[#9b9eaf] border border-[#292b3b]">
-                AUTO MEMORY FLUSH
-              </span>
-              <span className="font-mono-tech text-[10px] px-3 py-1 rounded-lg bg-[#171927] text-[#9b9eaf] border border-[#292b3b]">
-                KIOSK PIN PROTECTION
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* ===== STEP-BY-STEP USER FLOW ===== */}
       <section id="cara-kerja" className="py-24 px-4 sm:px-6 max-w-6xl mx-auto border-t border-[#292b3b]">
@@ -533,9 +516,6 @@ export default function LandingPage() {
       {/* ===== EVENT BOOKING CTA ===== */}
       <section id="sewa" className="py-24 px-4 sm:px-6 max-w-4xl mx-auto">
         <div className="bg-[#10111c] rounded-2xl p-8 sm:p-12 border border-[#292b3b] text-center relative overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-          <div className="inline-block relative mb-6">
-            <Logo size="md" variant="splash" animated />
-          </div>
 
           <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-[-0.04em] mb-4">
             Hadirkan AI Box di Acara Spesial Anda!

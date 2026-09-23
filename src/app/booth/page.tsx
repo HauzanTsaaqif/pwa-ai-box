@@ -61,8 +61,8 @@ import { QRCodeSVG } from "qrcode.react";
 // ===== CONSTANTS & ENVIRONMENT CONTROLS =====
 const HIDDEN_TAP_THRESHOLD = 5;
 const HIDDEN_TAP_TIMEOUT = 3000;
-const IDLE_FPS = 6;
-const ACTIVE_FPS = 15;
+const IDLE_FPS = 10;
+const ACTIVE_FPS = 30;
 const IS_DEBUG = process.env.NEXT_PUBLIC_DEBUG_MODE === "true";
 const ENABLE_PAYMENT = process.env.NEXT_PUBLIC_ENABLE_PAYMENT !== "false";
 const FREE_MODE_POSES = parseInt(process.env.NEXT_PUBLIC_FREE_MODE_POSES || "4", 10);
@@ -153,14 +153,14 @@ const FORMATS: FormatItem[] = [
     id: "strip_2x6",
     name: "Classic Strip (2x6)",
     ratio: "2:6 Vertikal",
-    description: "Format photobox klasik terfavorit, ideal untuk saku & bookmark.",
+    description: "Format photobooth klasik terfavorit, ideal untuk saku & bookmark.",
     badge: "Terpopuler",
   },
   {
-    id: "postcard_4x6",
-    name: "Wide Postcard (4x6)",
+    id: "double_4x6",
+    name: "Double Strip (4x6)",
     ratio: "4:6 Landscape",
-    description: "Format kartu pos estetik dengan bidang foto luas untuk grup.",
+    description: "Format photobooth populer dengan 2 strip foto klasik terfavorit, ideal untuk saku & bookmark.",
   },
   {
     id: "square_4x4",
@@ -266,12 +266,28 @@ export default function BoothPage() {
   const [lockedSelectionId, setLockedSelectionId] = useState<string | null>(null);
   const dwellCooldownRef = useRef<number>(0);
   const isTransitioningRef = useRef<boolean>(false);
+  const mustExitBeforeSelectRef = useRef<boolean>(false);
+  const lastSelectedElementRef = useRef<HTMLElement | null>(null);
+  const activeTargetRef = useRef<HTMLElement | null>(null);
+  const activeTargetIdRef = useRef<string | null>(null);
+  const dwellStartTimeRef = useRef<number>(0);
+  const [welcomeFlash, setWelcomeFlash] = useState<boolean>(true);
+
+  useEffect(() => {
+    const t = setTimeout(() => setWelcomeFlash(false), 450);
+    return () => clearTimeout(t);
+  }, []);
 
   const setStep = useCallback((newStep: BoothStep) => {
     stepRef.current = newStep;
     stepEntryTimeRef.current = Date.now();
-    dwellCooldownRef.current = Date.now() + 1000; // 1s cooldown on every step change
+    dwellCooldownRef.current = Date.now() + 800; // 0.8s cooldown on every step change
+    mustExitBeforeSelectRef.current = true; // User must exit previous hover zone first!
+    activeTargetRef.current = null;
+    activeTargetIdRef.current = null;
     setLockedSelectionId(null);
+    setHoveredItemId(null);
+    setDwellProgress(0);
     setStepState(newStep);
   }, []);
   const step = stepState;
@@ -282,8 +298,12 @@ export default function BoothPage() {
 
   // Gesture & Cursor Tracking State
   const [lastDetectedGesture, setLastDetectedGesture] = useState<GestureType>("none");
+  const lastDetectedGestureRef = useRef<GestureType>("none");
+  const [isHandDetected, setIsHandDetected] = useState<boolean>(false);
+  const isHandDetectedRef = useRef<boolean>(false);
   const cursorPosRef = useRef<{ x: number; y: number } | null>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
+  const targetCircleRef = useRef<HTMLDivElement>(null);
   const callbacksRef = useRef<any>({});
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
   const [dwellProgress, setDwellProgress] = useState(0);
@@ -699,19 +719,27 @@ export default function BoothPage() {
 
         // Set up MediaPipe Callback
         mp.onGesture((result: GestureResult) => {
-          setLastDetectedGesture(result.gesture);
+          const hasHand = Boolean(result.landmarks && result.landmarks.length >= 21);
+          if (hasHand !== isHandDetectedRef.current) {
+            isHandDetectedRef.current = hasHand;
+            setIsHandDetected(hasHand);
+          }
+
+          if (result.gesture !== lastDetectedGestureRef.current) {
+            lastDetectedGestureRef.current = result.gesture;
+            setLastDetectedGesture(result.gesture);
+          }
 
           // Draw full hand skeleton on canvas
           if (canvasRef.current) {
             const ctx = canvasRef.current.getContext("2d");
             if (ctx) {
-              if (result.landmarks && result.landmarks.length >= 21) {
+              if (hasHand) {
                 drawHandSkeleton(
                   ctx,
                   result.landmarks,
                   canvasRef.current.width,
-                  canvasRef.current.height,
-                  IS_DEBUG ? result.gesture : ""
+                  canvasRef.current.height
                 );
               } else {
                 ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -720,7 +748,7 @@ export default function BoothPage() {
           }
 
           // Track Hand Gesture Cursor Position (Index Finger Tip #8)
-          if (result.landmarks && result.landmarks[8]) {
+          if (hasHand && result.landmarks[8]) {
             const indexTip = result.landmarks[8];
             const px = (1 - indexTip.x) * 100;
             const py = indexTip.y * 100;
@@ -792,7 +820,7 @@ export default function BoothPage() {
     };
   }, [router]);
 
-  // ===== INTERACTIVE GESTURE TUTORIAL / WARM-UP DETECTION =====
+  // ===== INTERACTIVE GESTURE TUTORIAL / WARM-UP DETECTION (DYNAMIC BOUNDING RECT) =====
   useEffect(() => {
     if (step !== "gesture_tutorial") return;
 
@@ -804,14 +832,25 @@ export default function BoothPage() {
         return;
       }
 
-      // Check if cursor is near center target zone (around x: 50%, y: 56%)
-      const dx = pos.x - 50;
-      const dy = pos.y - 56;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      let inTarget = false;
+      if (targetCircleRef.current) {
+        const rect = targetCircleRef.current.getBoundingClientRect();
+        const cursorScreenX = (pos.x / 100) * window.innerWidth;
+        const cursorScreenY = (pos.y / 100) * window.innerHeight;
+        const circleCenterX = rect.left + rect.width / 2;
+        const circleCenterY = rect.top + rect.height / 2;
+        const radius = rect.width / 2;
+        const dist = Math.hypot(cursorScreenX - circleCenterX, cursorScreenY - circleCenterY);
+        inTarget = dist <= radius;
+      } else {
+        const dx = pos.x - 50;
+        const dy = pos.y - 50;
+        inTarget = Math.sqrt(dx * dx + dy * dy) < 15;
+      }
 
-      if (dist < 15) {
-        // Hand is hovering inside the tutorial target circle!
-        progress = Math.min(100, progress + 12);
+      if (inTarget) {
+        // Hand is hovering directly inside the tutorial target circle
+        progress = Math.min(100, progress + 10);
         setTutorialProgress(progress);
 
         if (progress >= 100) {
@@ -819,75 +858,141 @@ export default function BoothPage() {
           setTutorialCompleted(true);
           setTimeout(() => {
             setStep("select_package");
-          }, 900);
+          }, 800);
         }
       } else {
         progress = Math.max(0, progress - 8);
         setTutorialProgress(progress);
       }
-    }, 60);
+    }, 50);
 
     return () => clearInterval(interval);
   }, [step, setStep]);
 
-  // ===== ROBUST DWELL HOVER CLICK WITH COOLDOWN & CONFIRMATION DELAY =====
+  // ===== UNIVERSAL DWELL HOVER CLICK WITH 1.8s DELIBERATE LOCK & ALL-BUTTON SUPPORT =====
   useEffect(() => {
+    const DWELL_LOCK_MS = 1800; // 1.8s deliberate lock to prevent accidental quick triggers
+
     const hoverInterval = setInterval(() => {
       const currentStep = stepRef.current;
       const currentPos = cursorPosRef.current;
 
-      const isSelectionStep =
-        currentStep === "select_package" ||
-        currentStep === "select_format" ||
-        currentStep === "select_theme";
+      const nonClickableSteps =
+        currentStep === "welcome_intro" ||
+        currentStep === "gesture_tutorial" ||
+        currentStep === "countdown" ||
+        currentStep === "processing";
 
-      if (!isSelectionStep || !currentPos || Date.now() < dwellCooldownRef.current || isTransitioningRef.current) {
-        if (hoveredItemId) {
+      if (nonClickableSteps || !currentPos || Date.now() < dwellCooldownRef.current || isTransitioningRef.current) {
+        if (activeTargetRef.current) {
+          activeTargetRef.current = null;
+          activeTargetIdRef.current = null;
           setHoveredItemId(null);
           setDwellProgress(0);
-          if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
         }
         return;
       }
 
-      const elements = document.elementsFromPoint(
-        (currentPos.x / 100) * window.innerWidth,
-        (currentPos.y / 100) * window.innerHeight
-      );
+      const screenX = (currentPos.x / 100) * window.innerWidth;
+      const screenY = (currentPos.y / 100) * window.innerHeight;
+      const elements = document.elementsFromPoint(screenX, screenY);
 
-      const itemElem = elements.find((el) => el.getAttribute("data-dwell-id"));
-
-      if (itemElem) {
-        const itemId = itemElem.getAttribute("data-dwell-id");
-        if (itemId && itemId !== hoveredItemId) {
-          setHoveredItemId(itemId);
-          setDwellProgress(0);
-
-          if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
-
-          let startTime = Date.now();
-          dwellTimerRef.current = setInterval(() => {
-            const elapsed = Date.now() - startTime;
-            const pct = Math.min(100, Math.round((elapsed / 1300) * 100)); // 1.3s dwell
-            setDwellProgress(pct);
-
-            if (pct >= 100) {
-              clearInterval(dwellTimerRef.current!);
-              itemElem.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-            }
-          }, 40);
+      let interactiveTarget: HTMLElement | null = null;
+      for (const el of elements) {
+        // Support cards with data-dwell-id, buttons, and custom button roles
+        const card = (el.getAttribute("data-dwell-id") ? el : el.closest("[data-dwell-id]")) as HTMLElement | null;
+        if (card) {
+          interactiveTarget = card;
+          break;
         }
-      } else {
-        if (hoveredItemId) {
-          setHoveredItemId(null);
-          setDwellProgress(0);
-          if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
+        const btn = (el.tagName === "BUTTON" ? el : el.closest("button")) as HTMLElement | null;
+        if (btn && !(btn as HTMLButtonElement).disabled) {
+          interactiveTarget = btn;
+          break;
+        }
+        const roleBtn = (el.getAttribute("role") === "button" ? el : el.closest('[role="button"]')) as HTMLElement | null;
+        if (roleBtn) {
+          interactiveTarget = roleBtn;
+          break;
         }
       }
-    }, 80);
+
+      // Check Re-Arming System: If user just selected something, they must exit that box first!
+      if (mustExitBeforeSelectRef.current) {
+        if (
+          interactiveTarget &&
+          (interactiveTarget === lastSelectedElementRef.current ||
+            lastSelectedElementRef.current?.contains(interactiveTarget) ||
+            interactiveTarget.contains(lastSelectedElementRef.current as Node))
+        ) {
+          // Hand is still inside previous box: keep idle, do not dwell
+          if (activeTargetRef.current) {
+            activeTargetRef.current = null;
+            activeTargetIdRef.current = null;
+            setHoveredItemId(null);
+            setDwellProgress(0);
+          }
+          return;
+        } else {
+          // Hand exited previous box into open space or another zone: re-arm!
+          mustExitBeforeSelectRef.current = false;
+          lastSelectedElementRef.current = null;
+        }
+      }
+
+      if (interactiveTarget) {
+        const targetId =
+          interactiveTarget.getAttribute("data-dwell-id") ||
+          interactiveTarget.id ||
+          interactiveTarget.getAttribute("aria-label") ||
+          interactiveTarget.textContent?.trim().slice(0, 20) ||
+          "interactive-target";
+
+        if (interactiveTarget !== activeTargetRef.current) {
+          // New target hovered
+          activeTargetRef.current = interactiveTarget;
+          activeTargetIdRef.current = targetId;
+          dwellStartTimeRef.current = Date.now();
+          setHoveredItemId(targetId);
+          setDwellProgress(0);
+        } else {
+          // Continuing hover on the same target: increment progress smoothly!
+          const elapsed = Date.now() - dwellStartTimeRef.current;
+          const pct = Math.min(100, Math.round((elapsed / DWELL_LOCK_MS) * 100));
+          setDwellProgress(pct);
+
+          if (pct >= 100) {
+            mustExitBeforeSelectRef.current = true;
+            lastSelectedElementRef.current = interactiveTarget;
+            activeTargetRef.current = null;
+            activeTargetIdRef.current = null;
+            setHoveredItemId(null);
+            setDwellProgress(0);
+
+            // Execute click with both synthetic MouseEvent and native .click()
+            try {
+              interactiveTarget.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window }));
+              interactiveTarget.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, view: window }));
+              interactiveTarget.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
+            } catch (err) {}
+            interactiveTarget.click();
+          }
+        }
+      } else {
+        // Open space: clear dwell and re-arm
+        mustExitBeforeSelectRef.current = false;
+        lastSelectedElementRef.current = null;
+        if (activeTargetRef.current) {
+          activeTargetRef.current = null;
+          activeTargetIdRef.current = null;
+          setHoveredItemId(null);
+          setDwellProgress(0);
+        }
+      }
+    }, 30);
 
     return () => clearInterval(hoverInterval);
-  }, [hoveredItemId]);
+  }, []);
 
   // ===== SELECTION HANDLERS WITH CONFIRMATION PAUSE =====
   const handleSelectPackage = (pkg: PackageItem) => {
@@ -1197,34 +1302,16 @@ export default function BoothPage() {
       <div className="camera-bracket-bl opacity-50 pointer-events-none z-30" />
       <div className="camera-bracket-br opacity-50 pointer-events-none z-30" />
 
-      {/* ===== TOP STATUS BAR (Visible except on welcome intro) ===== */}
-      {step !== "welcome_intro" && (
-        <header className="absolute top-5 inset-x-8 z-30 flex items-center justify-between pointer-events-none">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2.5 px-3.5 py-1.5 bg-[#10111c]/85 backdrop-blur-md rounded-xl border border-[#292b3b] pointer-events-auto shadow-md">
-              <span className="w-2 h-2 rounded-full bg-[#f0a25c] animate-pulse" />
-              <span className="font-mono-tech text-[11px] font-bold text-white tracking-widest uppercase">
-                AIBOX
-              </span>
-            </div>
-
-            {lastDetectedGesture !== "none" && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="px-3 py-1 bg-[#ff7b00]/15 border border-[#ff7b00]/30 rounded-xl font-mono-tech text-[10px] text-[#f0a25c] tracking-wider uppercase font-bold"
-              >
-                GESTURE: {lastDetectedGesture.toUpperCase()}
-              </motion.div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 px-3.5 py-1.5 bg-[#10111c]/85 backdrop-blur-md rounded-xl border border-[#292b3b] pointer-events-auto shadow-md">
-            <div className={`w-2 h-2 rounded-full ${!ENABLE_PAYMENT ? "bg-emerald-400" : "bg-[#246cff]"} animate-pulse`} />
-            <span className="font-mono-tech text-white text-[11px] font-medium tracking-wider uppercase">
-              {!ENABLE_PAYMENT ? `FREE MODE (${FREE_MODE_POSES} POSES)` : "KIOSK READY"}
-            </span>
-          </div>
+      {/* ===== TOP STATUS BAR ===== */}
+      {step !== "welcome_intro" && lastDetectedGesture !== "none" && (
+        <header className="absolute top-5 left-8 z-30 pointer-events-none">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="px-3 py-1 bg-[#ff7b00]/15 border border-[#ff7b00]/30 rounded-xl font-mono-tech text-[10px] text-[#f0a25c] tracking-wider uppercase font-bold shadow-md"
+          >
+            GESTURE: {lastDetectedGesture.toUpperCase()}
+          </motion.div>
         </header>
       )}
 
@@ -1237,28 +1324,34 @@ export default function BoothPage() {
         >
           <div className="relative w-full h-full flex items-center justify-center">
             {hoveredItemId && (
-              <svg className="absolute inset-0 w-full h-full transform -rotate-90">
-                <circle
-                  cx="35"
-                  cy="35"
-                  r="30"
-                  stroke="rgba(240, 162, 92, 0.2)"
-                  strokeWidth="3"
-                  fill="none"
-                />
-                <circle
-                  cx="35"
-                  cy="35"
-                  r="30"
-                  stroke="#f0a25c"
-                  strokeWidth="3.5"
-                  strokeDasharray="188"
-                  strokeDashoffset={188 - (188 * dwellProgress) / 100}
-                  strokeLinecap="round"
-                  fill="none"
-                  className="transition-all duration-75 drop-shadow-[0_0_8px_#f0a25c]"
-                />
-              </svg>
+              <>
+                <svg className="absolute inset-0 w-full h-full transform -rotate-90">
+                  <circle
+                    cx="35"
+                    cy="35"
+                    r="28"
+                    stroke="rgba(240, 162, 92, 0.25)"
+                    strokeWidth="3.5"
+                    fill="none"
+                  />
+                  <circle
+                    cx="35"
+                    cy="35"
+                    r="28"
+                    stroke="#f0a25c"
+                    strokeWidth="4"
+                    strokeDasharray="176"
+                    strokeDashoffset={176 - (176 * dwellProgress) / 100}
+                    strokeLinecap="round"
+                    fill="none"
+                    className="transition-all duration-75 drop-shadow-[0_0_10px_#f0a25c]"
+                  />
+                </svg>
+                {/* Dwell percentage lock pill */}
+                <div className="absolute -bottom-6 px-1.5 py-0.5 rounded bg-black/85 border border-[#f0a25c]/50 font-mono-tech text-[9px] font-bold text-[#f0a25c] tracking-wider pointer-events-none shadow-md">
+                  {dwellProgress}%
+                </div>
+              </>
             )}
 
             <div className="w-6 h-6 rounded-full border border-[#f0a25c] bg-[#10111c]/70 backdrop-blur-md flex items-center justify-center">
@@ -1280,47 +1373,82 @@ export default function BoothPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.6 }}
-            className="absolute inset-0 z-50 bg-[#090a12] flex flex-col items-center justify-between p-8 sm:p-14 text-center select-none"
+            className="absolute inset-0 z-50 bg-[#090a12] flex flex-col items-center justify-center p-6 sm:p-12 text-center select-none overflow-hidden"
           >
-            <div className="h-4" />
+            {/* Camera Shutter Flash Strobe (Kepretan Kamera) on Mount */}
+            <AnimatePresence>
+              {welcomeFlash && (
+                <motion.div
+                  initial={{ opacity: 0.95 }}
+                  animate={{ opacity: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.45, ease: "easeOut" }}
+                  className="absolute inset-0 bg-white z-[60] pointer-events-none"
+                />
+              )}
+            </AnimatePresence>
 
-            <div className="flex flex-col items-center max-w-2xl">
-              <div className="mb-4">
-                <Logo size="lg" variant="splash" animated priority />
-              </div>
+            {/* Ambient Depth Radial Gradient */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[380px] bg-gradient-to-b from-[#2e3247]/30 to-transparent rounded-full blur-[120px] pointer-events-none" />
 
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#ff7b00]/10 border border-[#ff7b00]/25 text-[#f0a25c] text-xs font-semibold tracking-wider uppercase mb-5">
-                <Sparkles className="w-3.5 h-3.5 text-[#ff7b00]" />
-                <span>AI Box Photobooth Experience</span>
-              </div>
+            <div className="relative z-10 flex flex-col items-center max-w-3xl px-4">
+              {/* Studio Telemetry Badge with Camera Aperture */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#f0a25c]/10 border border-[#f0a25c]/30 text-[#f0a25c] text-[11px] font-mono-tech tracking-widest uppercase mb-7 shadow-[0_0_20px_rgba(240,162,92,0.15)]"
+              >
+                <Camera className="w-3.5 h-3.5 text-[#f0a25c] animate-pulse" />
+                <span>STUDIO STROBE READY // AF-LOCK 50MM</span>
+              </motion.div>
 
-              <h1 className="text-4xl sm:text-6xl font-bold text-white tracking-[-0.06em] leading-[0.96] mb-5">
-                Capture Your Essence,<br />
-                <span className="text-[#f0a25c]">Elevated by aibox.</span>
-              </h1>
+              {/* Viewfinder Target Framing Around Title */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.7, delay: 0.2 }}
+                className="relative p-6 sm:p-8"
+              >
+                {/* Viewfinder Corner Brackets */}
+                <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-[#f0a25c]/70 pointer-events-none" />
+                <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-[#f0a25c]/70 pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-[#f0a25c]/70 pointer-events-none" />
+                <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-[#f0a25c]/70 pointer-events-none" />
 
-              <p className="text-[#9b9eaf] text-base sm:text-lg max-w-lg mx-auto leading-relaxed mb-8">
+                <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-[-0.06em] leading-[0.96] text-white">
+                  <span className="block drop-shadow-[0_4px_20px_rgba(0,0,0,0.8)]">
+                    Capture Your Essence,
+                  </span>
+                  <span className="block mt-2 bg-gradient-to-r from-[#f0a25c] via-[#ffedd5] to-[#f0a25c] bg-clip-text text-transparent bg-[length:200%_auto] animate-pulse">
+                    Elevated by aibox.
+                  </span>
+                </h1>
+              </motion.div>
+
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.35 }}
+                className="text-[#9b9eaf] text-sm sm:text-base max-w-lg mx-auto leading-relaxed mb-8 mt-2"
+              >
                 Selamat datang di studio photobox masa depan. Seluruh sistem dikendalikan dengan
                 gestur tangan pintar tanpa menyentuh layar. Bersiaplah untuk momen terbaik Anda!
-              </p>
+              </motion.p>
 
-              {/* 5-Second Circular Progress Ring & Timer */}
-              <div className="flex items-center gap-3 px-5 py-2.5 rounded-xl bg-[#10111c] border border-[#292b3b]">
+              {/* 5-Second Progress Pill */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.45 }}
+                className="flex items-center gap-3 px-5 py-2.5 rounded-xl bg-[#10111c] border border-[#292b3b] shadow-2xl"
+              >
                 <div className="w-4 h-4 rounded-full border-2 border-[#f0a25c] border-t-transparent animate-spin" />
                 <span className="text-xs font-mono-tech text-white font-medium">
                   Memulai Dalam <strong className="text-[#f0a25c]">{welcomeCountdown} Detik</strong>...
                 </span>
-              </div>
+              </motion.div>
             </div>
-
-            {/* Skip Button */}
-            <button
-              onClick={() => setStep("gesture_tutorial")}
-              className="text-xs font-semibold text-[#9b9eaf] hover:text-white transition-colors flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#10111c] border border-[#292b3b]"
-            >
-              <span>Lewati Sambutan</span>
-              <ChevronRight className="w-4 h-4 text-[#f0a25c]" />
-            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1335,7 +1463,11 @@ export default function BoothPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-30 bg-[#090a12]/75 backdrop-blur-sm flex flex-col items-center justify-between p-6 sm:p-10 text-center"
+            className={`absolute inset-0 z-30 flex flex-col items-center justify-between p-6 sm:p-10 text-center transition-all duration-500 ${
+              isHandDetected
+                ? "bg-[#090a12]/45 backdrop-blur-none"
+                : "bg-[#090a12]/80 backdrop-blur-md"
+            }`}
           >
             {/* Top Prompt */}
             <div className="mt-8 max-w-md">
@@ -1347,28 +1479,32 @@ export default function BoothPage() {
                 Coba Gerak-Gerakkan Tangan Anda!
               </h2>
               <p className="text-[#9b9eaf] text-xs sm:text-sm leading-relaxed">
-                Arahkan telapak tangan ke depan kamera dan bawa lingkaran sensor ke target di bawah.
+                {isHandDetected
+                  ? "Bagus! Skeleton tangan terdeteksi. Bawa kursor ke dalam lingkaran target."
+                  : "Arahkan tangan ke depan kamera sampai skeleton terdeteksi."}
               </p>
             </div>
 
             {/* Central Target Sensor Portal */}
             <div className="relative my-auto flex flex-col items-center justify-center">
               <motion.div
+                ref={targetCircleRef}
                 animate={
                   tutorialCompleted
                     ? { scale: [1, 1.15, 1] }
                     : { scale: [1, 1.05, 1] }
                 }
                 transition={{ duration: 1.5, repeat: Infinity }}
-                className={`relative w-44 h-44 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${tutorialCompleted
-                  ? "bg-emerald-500/20 border-emerald-400 shadow-[0_0_40px_rgba(52,211,153,0.5)]"
-                  : tutorialProgress > 0
+                className={`relative w-44 h-44 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+                  tutorialCompleted
+                    ? "bg-emerald-500/20 border-emerald-400 shadow-[0_0_40px_rgba(52,211,153,0.5)]"
+                    : tutorialProgress > 0
                     ? "bg-[#f0a25c]/15 border-[#f0a25c] shadow-[0_0_35px_rgba(240,162,92,0.4)]"
                     : "bg-[#10111c]/80 border-[#292b3b] shadow-2xl"
-                  }`}
+                }`}
               >
                 {/* Radial Progress Gauge */}
-                <svg className="absolute inset-0 w-full h-full transform -rotate-90">
+                <svg className="absolute inset-0 w-full h-full transform -rotate-90 pointer-events-none">
                   <circle
                     cx="88"
                     cy="88"
@@ -1392,12 +1528,12 @@ export default function BoothPage() {
                 </svg>
 
                 {/* Inner Icon & Message */}
-                <div className="flex flex-col items-center justify-center text-center p-4">
+                <div className="flex flex-col items-center justify-center text-center p-4 select-none">
                   {tutorialCompleted ? (
                     <motion.div
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
-                      className="text-emerald-400 flex flex-col items-center"
+                      className="text-emerald-400 flex flex-col items-center justify-center"
                     >
                       <CheckCircle2 className="w-12 h-12 mb-1" />
                       <span className="font-bold text-xs text-white uppercase tracking-wider">
@@ -1405,13 +1541,13 @@ export default function BoothPage() {
                       </span>
                     </motion.div>
                   ) : (
-                    <>
+                    <div className="flex flex-col items-center justify-center">
                       <Hand className="w-10 h-10 text-[#f0a25c] mb-1.5 animate-bounce" />
                       <span className="text-xs font-bold text-white uppercase tracking-wider">
                         {tutorialProgress > 0 ? `${tutorialProgress}%` : "Arahkan Tangan"}
                       </span>
                       <span className="text-[10px] text-[#9b9eaf]">Ke Lingkaran Ini</span>
-                    </>
+                    </div>
                   )}
                 </div>
               </motion.div>
@@ -1421,13 +1557,8 @@ export default function BoothPage() {
               </span>
             </div>
 
-            {/* Skip Button */}
-            <button
-              onClick={() => setStep("select_package")}
-              className="text-xs font-semibold text-[#9b9eaf] hover:text-white transition-colors flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#10111c]/90 border border-[#292b3b]"
-            >
-              <span>Lewati Latihan ➔</span>
-            </button>
+            {/* Bottom spacer for balance */}
+            <div className="h-6" />
           </motion.div>
         )}
       </AnimatePresence>

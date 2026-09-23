@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Box — Capture Your Essence, Elevated by aibox",
+  title: "AI BOX, Capture!",
   description:
     "The world's premier AI-powered photobooth with gesture control — built for effortless, unforgettable moments.",
   manifest: "/manifest.json",
