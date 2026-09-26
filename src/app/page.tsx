@@ -325,7 +325,7 @@ export default function LandingPage() {
                 {/* Video container with realistic UI Box Overlay */}
                 <div className="relative aspect-video rounded-xl bg-[#090a12] border border-[#292b3b] overflow-hidden shadow-2xl">
                   <video
-                    src="/model_a.mp4"
+                    src="/video/model_a.mp4"
                     autoPlay
                     loop
                     muted
@@ -384,7 +384,7 @@ export default function LandingPage() {
                 {/* Video container with realistic UI Box Overlay */}
                 <div className="relative aspect-video rounded-xl bg-[#090a12] border border-[#292b3b] overflow-hidden shadow-2xl">
                   <video
-                    src="/model_b.mp4"
+                    src="/video/model_b.mp4"
                     autoPlay
                     loop
                     muted

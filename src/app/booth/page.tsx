@@ -29,6 +29,15 @@ import {
   ShieldCheck,
   Target,
 } from "lucide-react";
+import {
+  FORMATS,
+  FRAMES,
+  THEMES,
+  FormatItem,
+  FrameTemplate,
+  ThemeItem,
+  compositePhotosIntoFrame,
+} from "@/lib/frames";
 
 function PeaceIcon({ className = "w-6 h-6" }: { className?: string }) {
   return (
@@ -96,26 +105,6 @@ export interface PackageItem {
   features: string[];
 }
 
-export interface FormatItem {
-  id: string;
-  name: string;
-  ratio: string;
-  description: string;
-  badge?: string;
-}
-
-export interface ThemeItem {
-  id: string;
-  name: string;
-  tagline: string;
-  bgHex: string;
-  textHex: string;
-  accentHex: string;
-  borderHex: string;
-  description: string;
-  styleVariant: "noir" | "honey" | "midnight" | "pastel" | "vintage" | "kodak";
-}
-
 const PACKAGES: PackageItem[] = [
   {
     id: "basic",
@@ -148,96 +137,7 @@ const PACKAGES: PackageItem[] = [
   },
 ];
 
-const FORMATS: FormatItem[] = [
-  {
-    id: "strip_2x6",
-    name: "Classic Strip (2x6)",
-    ratio: "2:6 Vertikal",
-    description: "Format photobooth klasik terfavorit, ideal untuk saku & bookmark.",
-    badge: "Terpopuler",
-  },
-  {
-    id: "double_4x6",
-    name: "Double Strip (4x6)",
-    ratio: "4:6 Landscape",
-    description: "Format photobooth populer dengan 2 strip foto klasik terfavorit, ideal untuk saku & bookmark.",
-  },
-  {
-    id: "square_4x4",
-    name: "Square Grid (4x4)",
-    ratio: "1:1 Kotak",
-    description: "Format grid modern estetik untuk feed Instagram & album.",
-  },
-];
 
-const THEMES: ThemeItem[] = [
-  {
-    id: "noir",
-    name: "Minimalist Noir",
-    tagline: "STUDIO NOIR // EDITORIAL",
-    bgHex: "#090a12",
-    textHex: "#f7f7fb",
-    accentHex: "#9b9eaf",
-    borderHex: "#292b3b",
-    description: "Monokrom mewah & editorial kelas galeri.",
-    styleVariant: "noir",
-  },
-  {
-    id: "honey",
-    name: "Warm Honey Studio",
-    tagline: "HONEY MOMENTS // WARM TONE",
-    bgHex: "#14110f",
-    textHex: "#fff7ed",
-    accentHex: "#f0a25c",
-    borderHex: "#452e1f",
-    description: "Nuansa hangat kuning-mustard estetik & bersahabat.",
-    styleVariant: "honey",
-  },
-  {
-    id: "midnight",
-    name: "Midnight Royal",
-    tagline: "NIGHTFALL EDITION // CYBER",
-    bgHex: "#0a0e1a",
-    textHex: "#ffffff",
-    accentHex: "#246cff",
-    borderHex: "#1e2c4f",
-    description: "Biru malam elegan dengan aksen royal blue.",
-    styleVariant: "midnight",
-  },
-  {
-    id: "pastel",
-    name: "Pastel Dream",
-    tagline: "CHERRY BLOSSOM // SWEET",
-    bgHex: "#1c1421",
-    textHex: "#fdf2f8",
-    accentHex: "#f472b6",
-    borderHex: "#3b2344",
-    description: "Sentuhan lembut manis untuk momen ceria.",
-    styleVariant: "pastel",
-  },
-  {
-    id: "vintage",
-    name: "Vintage Y2K",
-    tagline: "Y2K DIGITAL ARCHIVE // 2000s",
-    bgHex: "#12141c",
-    textHex: "#e2e8f0",
-    accentHex: "#38bdf8",
-    borderHex: "#334155",
-    description: "Sentuhan retro futuristik dengan stempel cyber Y2K.",
-    styleVariant: "vintage",
-  },
-  {
-    id: "kodak",
-    name: "Classic Film 35mm",
-    tagline: "ANALOG EMULSION // ISO 400",
-    bgHex: "#181512",
-    textHex: "#fef3c7",
-    accentHex: "#fbbf24",
-    borderHex: "#422006",
-    description: "Bingkai film analog vintage dengan perforasi rol film.",
-    styleVariant: "kodak",
-  },
-];
 
 export default function BoothPage() {
   const router = useRouter();
@@ -352,6 +252,11 @@ export default function BoothPage() {
   const [welcomeCountdown, setWelcomeCountdown] = useState(5);
   const [qrisTimer, setQrisTimer] = useState(5);
   const [photoCountdown, setPhotoCountdown] = useState(3);
+  const [isIntermission, setIsIntermission] = useState(false);
+  const [intermissionCountdown, setIntermissionCountdown] = useState(2);
+  const [previewStripUrl, setPreviewStripUrl] = useState<string>("");
+  const [isCompositingPreview, setIsCompositingPreview] = useState(false);
+  const smoothedLandmarksRef = useRef<any[] | null>(null);
   const [processProgress, setProcessProgress] = useState(0);
   const [printCopies, setPrintCopies] = useState(1);
   const [isPrinting, setIsPrinting] = useState(false);
@@ -477,147 +382,13 @@ export default function BoothPage() {
     isRecordingVoiceRef.current = false;
   }, []);
 
-  // ===== CANVAS COMPOSITING (300 DPI MULTI-THEME ENGINE) =====
+  // ===== CANVAS COMPOSITING (300 DPI REAL FRAME ENGINE) =====
   const generateFilmStrip = useCallback(
     async (photoUrls: string[]): Promise<string> => {
-      return new Promise((resolve) => {
-        if (photoUrls.length === 0) return resolve("");
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return resolve("");
-
-        const theme = selectedTheme || THEMES[0];
-        const format = selectedFormat || FORMATS[0];
-
-        let canvasWidth = 800;
-        let canvasHeight = 1800;
-
-        if (format.id === "postcard_4x6") {
-          canvasWidth = 1800;
-          canvasHeight = 1200;
-        } else if (format.id === "square_4x4") {
-          canvasWidth = 1400;
-          canvasHeight = 1400;
-        }
-
-        canvas.width = canvasWidth;
-        canvas.height = canvasHeight;
-
-        // Background
-        ctx.fillStyle = theme.bgHex;
-        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-
-        // Border frame
-        ctx.strokeStyle = theme.borderHex;
-        ctx.lineWidth = 14;
-        ctx.strokeRect(7, 7, canvasWidth - 14, canvasHeight - 14);
-
-        // Header Text
-        ctx.fillStyle = theme.textHex;
-        ctx.font = "bold 40px -apple-system, BlinkMacSystemFont, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("AI BOX PHOTOBOOTH", canvasWidth / 2, 70);
-
-        ctx.fillStyle = theme.accentHex;
-        ctx.font = "600 19px -apple-system, BlinkMacSystemFont, sans-serif";
-        ctx.fillText(theme.tagline || "CAPTURE YOUR ESSENCE // STUDIO EDITION", canvasWidth / 2, 105);
-
-        const drawImageCover = (
-          image: HTMLImageElement,
-          x: number,
-          y: number,
-          w: number,
-          h: number
-        ) => {
-          const imgRatio = image.width / image.height;
-          const targetRatio = w / h;
-          let sx = 0;
-          let sy = 0;
-          let sWidth = image.width;
-          let sHeight = image.height;
-
-          if (imgRatio > targetRatio) {
-            sWidth = image.height * targetRatio;
-            sx = (image.width - sWidth) / 2;
-          } else {
-            sHeight = image.width / targetRatio;
-            sy = (image.height - sHeight) / 2;
-          }
-
-          ctx.drawImage(image, sx, sy, sWidth, sHeight, x, y, w, h);
-        };
-
-        let loaded = 0;
-        const imgs: HTMLImageElement[] = [];
-
-        photoUrls.forEach((url, i) => {
-          const img = new Image();
-          img.onload = () => {
-            loaded++;
-            imgs[i] = img;
-            if (loaded === photoUrls.length) {
-              if (format.id === "strip_2x6") {
-                const padX = 40;
-                const padY = 24;
-                const startY = 135;
-                const availableH = canvasHeight - startY - 90;
-                const singleH = (availableH - padY * (photoUrls.length - 1)) / photoUrls.length;
-                const singleW = canvasWidth - padX * 2;
-
-                imgs.forEach((loadedImg, idx) => {
-                  const y = startY + idx * (singleH + padY);
-                  drawImageCover(loadedImg, padX, y, singleW, singleH);
-                });
-              } else if (format.id === "postcard_4x6") {
-                const cols = 2;
-                const rows = Math.ceil(photoUrls.length / 2);
-                const pad = 30;
-                const startY = 140;
-                const cellW = (canvasWidth - pad * 3) / cols;
-                const cellH = (canvasHeight - startY - 90 - pad * (rows - 1)) / rows;
-
-                imgs.forEach((loadedImg, idx) => {
-                  const col = idx % cols;
-                  const row = Math.floor(idx / cols);
-                  const x = pad + col * (cellW + pad);
-                  const y = startY + row * (cellH + pad);
-                  drawImageCover(loadedImg, x, y, cellW, cellH);
-                });
-              } else {
-                const cols = 2;
-                const pad = 30;
-                const startY = 140;
-                const cellW = (canvasWidth - pad * 3) / cols;
-                const cellH = (canvasHeight - startY - 90 - pad) / 2;
-
-                imgs.forEach((loadedImg, idx) => {
-                  if (idx >= 4) return;
-                  const col = idx % cols;
-                  const row = Math.floor(idx / cols);
-                  const x = pad + col * (cellW + pad);
-                  const y = startY + row * (cellH + pad);
-                  drawImageCover(loadedImg, x, y, cellW, cellH);
-                });
-              }
-
-              // Footer
-              ctx.fillStyle = theme.accentHex;
-              ctx.font = "italic 20px -apple-system, BlinkMacSystemFont, sans-serif";
-              ctx.textAlign = "center";
-              ctx.fillText(
-                `Elevated by aibox • ${new Date().toLocaleDateString("id-ID")}`,
-                canvasWidth / 2,
-                canvasHeight - 35
-              );
-
-              resolve(canvas.toDataURL("image/jpeg", 0.94));
-            }
-          };
-          img.src = url;
-        });
-      });
+      const frame = selectedTheme || FRAMES[0];
+      return compositePhotosIntoFrame(photoUrls, frame);
     },
-    [selectedFormat, selectedTheme]
+    [selectedTheme]
   );
 
   // ===== GOOGLE DRIVE UPLOAD HANDLER =====
@@ -767,14 +538,35 @@ export default function BoothPage() {
             setLastDetectedGesture(result.gesture);
           }
 
-          // Draw full hand skeleton on canvas
+          // Smooth landmarks with Exponential Moving Average (EMA) to eliminate micro-jitter ("anti-wiggly")
+          let activeLandmarks = result.landmarks;
+          if (hasHand && result.landmarks) {
+            if (!smoothedLandmarksRef.current || smoothedLandmarksRef.current.length !== result.landmarks.length) {
+              smoothedLandmarksRef.current = result.landmarks.map((l) => ({ ...l }));
+            } else {
+              const alpha = 0.65; // High stability + zero perceived latency
+              smoothedLandmarksRef.current = result.landmarks.map((l, i) => {
+                const prev = smoothedLandmarksRef.current![i];
+                return {
+                  x: prev.x * alpha + l.x * (1 - alpha),
+                  y: prev.y * alpha + l.y * (1 - alpha),
+                  z: (prev.z ?? 0) * alpha + (l.z ?? 0) * (1 - alpha),
+                };
+              });
+            }
+            activeLandmarks = smoothedLandmarksRef.current;
+          } else {
+            smoothedLandmarksRef.current = null;
+          }
+
+          // Draw full hand skeleton on canvas using smoothed landmarks
           if (canvasRef.current) {
             const ctx = canvasRef.current.getContext("2d");
             if (ctx) {
-              if (hasHand) {
+              if (hasHand && activeLandmarks) {
                 drawHandSkeleton(
                   ctx,
-                  result.landmarks,
+                  activeLandmarks,
                   canvasRef.current.width,
                   canvasRef.current.height
                 );
@@ -784,9 +576,9 @@ export default function BoothPage() {
             }
           }
 
-          // Track Hand Gesture Cursor Position (Index Finger Tip #8)
-          if (hasHand && result.landmarks[8]) {
-            const indexTip = result.landmarks[8];
+          // Track Hand Gesture Cursor Position using smoothed Index Finger Tip #8
+          if (hasHand && activeLandmarks && activeLandmarks[8]) {
+            const indexTip = activeLandmarks[8];
             targetCursorPosRef.current = {
               x: (1 - indexTip.x) * 100,
               y: indexTip.y * 100,
@@ -1081,6 +873,11 @@ export default function BoothPage() {
     isTransitioningRef.current = true;
     setLockedSelectionId(fmt.id);
     setSelectedFormat(fmt);
+    const matchingFrames = FRAMES.filter((f) => f.formatId === fmt.id);
+    if (matchingFrames.length > 0) {
+      setSelectedTheme(matchingFrames[0]);
+    }
+    setThemePage(0);
     setHoveredItemId(null);
     if (activeTargetRef.current) clearDwellProgressDOM(activeTargetRef.current);
     if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
@@ -1133,46 +930,93 @@ export default function BoothPage() {
     }
   }, [step, setStep]);
 
-  // ===== PHOTO COUNTDOWN & SNAPSHOT CAPTURE ENGINE =====
+  // ===== AUTOMATED MULTI-POSE COUNTDOWN & COMPOSITING ENGINE =====
   useEffect(() => {
-    if (step === "countdown") {
+    if (step !== "countdown") return;
+
+    let timer: NodeJS.Timeout | null = null;
+    let cancelled = false;
+
+    // Reset countdown states
+    setPhotoCountdown(3);
+    setIsIntermission(false);
+
+    // Number of poses is determined by the selected frame's slots / defaultPoses
+    const totalPoses = selectedTheme?.defaultPoses || selectedTheme?.slots?.length || 3;
+    const collected: string[] = [];
+
+    const runCountdownForPose = (poseIdx: number) => {
+      if (cancelled) return;
+      setCurrentPoseIndex(poseIdx);
+      setIsIntermission(false);
       setPhotoCountdown(3);
 
-      const interval = setInterval(() => {
-        setPhotoCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
+      let currentSec = 3;
+      timer = setInterval(() => {
+        if (cancelled) {
+          if (timer) clearInterval(timer);
+          return;
+        }
 
-            // Studio Xenon Flash
-            setXenonFlash(true);
-            setTimeout(() => setXenonFlash(false), 300);
+        currentSec -= 1;
+        setPhotoCountdown(currentSec);
 
-            const snapshot = captureSnapshot();
-            if (snapshot) {
-              setCapturedPhotos((prevPhotos) => {
-                const updated = [...prevPhotos, snapshot];
-                const totalPoses = selectedPkg?.poses || 3;
+        if (currentSec <= 0) {
+          if (timer) clearInterval(timer);
 
-                if (updated.length < totalPoses) {
-                  setCurrentPoseIndex(updated.length);
-                  setTimeout(() => setStep("pose_ready"), 700);
-                } else {
-                  setTimeout(() => setStep("preview_retake"), 700);
-                }
-                return updated;
-              });
-            } else {
-              setTimeout(() => setStep("preview_retake"), 500);
-            }
-            return 0;
+          // Studio Xenon Flash
+          setXenonFlash(true);
+          setTimeout(() => setXenonFlash(false), 300);
+
+          // Capture snapshot
+          const snapshot = captureSnapshot();
+          if (snapshot) {
+            collected.push(snapshot);
+            setCapturedPhotos([...collected]);
           }
-          return prev - 1;
-        });
-      }, 1000);
 
-      return () => clearInterval(interval);
-    }
-  }, [step, captureSnapshot, selectedPkg, setStep]);
+          // Check if more poses needed for this frame
+          if (collected.length < totalPoses && !cancelled) {
+            // Short 2s intermission to change pose
+            setIsIntermission(true);
+            setIntermissionCountdown(2);
+            let interSec = 2;
+
+            timer = setInterval(() => {
+              if (cancelled) {
+                if (timer) clearInterval(timer);
+                return;
+              }
+              interSec -= 1;
+              setIntermissionCountdown(interSec);
+              if (interSec <= 0) {
+                if (timer) clearInterval(timer);
+                runCountdownForPose(collected.length);
+              }
+            }, 1000);
+          } else if (!cancelled) {
+            // All poses captured! Immediately composite photo + frame for instant preview
+            setIsCompositingPreview(true);
+            const frame = selectedTheme || FRAMES[0];
+            compositePhotosIntoFrame(collected, frame).then((base64) => {
+              if (cancelled) return;
+              photostripBase64Ref.current = base64;
+              setPreviewStripUrl(base64);
+              setIsCompositingPreview(false);
+              setStep("preview_retake");
+            });
+          }
+        }
+      }, 1000);
+    };
+
+    runCountdownForPose(0);
+
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
+  }, [step, selectedTheme, captureSnapshot, setStep]);
 
   // ===== PROCESSING (CANVAS COMPOSITING 300 DPI) =====
   useEffect(() => {
@@ -1243,7 +1087,9 @@ export default function BoothPage() {
   const handleResetToWelcome = () => {
     setSelectedPkg(null);
     setCapturedPhotos([]);
+    setPreviewStripUrl("");
     setCurrentPoseIndex(0);
+    setIsIntermission(false);
     setEmailInput("");
     setDriveFolderUrl("");
     setDriveFolderName("");
@@ -1257,12 +1103,18 @@ export default function BoothPage() {
   };
 
   const handleConfirmPreview = () => {
-    setStep("processing");
+    if (photostripBase64Ref.current || previewStripUrl) {
+      setStep("print_session");
+    } else {
+      setStep("processing");
+    }
   };
 
   const handleRetake = () => {
     setCapturedPhotos([]);
+    setPreviewStripUrl("");
     setCurrentPoseIndex(0);
+    setIsIntermission(false);
     setStep("pose_ready");
   };
 
@@ -1391,7 +1243,7 @@ export default function BoothPage() {
           <div className="relative w-full h-full flex items-center justify-center">
             {hoveredItemId && (
               <>
-                <svg className="absolute inset-0 w-full h-full transform -rotate-90">
+                <svg className="absolute inset-0 w-full h-full transform -rotate-90 overflow-visible" viewBox="0 0 70 70">
                   <circle
                     cx="35"
                     cy="35"
@@ -1411,22 +1263,23 @@ export default function BoothPage() {
                     strokeDashoffset={176}
                     strokeLinecap="round"
                     fill="none"
-                    className="transition-all duration-75 drop-shadow-[0_0_10px_#f0a25c]"
+                    className="transition-all duration-75"
                   />
                 </svg>
                 {/* Dwell percentage lock pill */}
                 <div
                   ref={cursorPercentRef}
-                  className="absolute -bottom-6 px-1.5 py-0.5 rounded bg-black/85 border border-[#f0a25c]/50 font-mono-tech text-[9px] font-bold text-[#f0a25c] tracking-wider pointer-events-none shadow-md"
+                  className="absolute -bottom-6 px-2 py-0.5 rounded-full bg-black/90 border border-[#f0a25c]/50 font-mono-tech text-[9px] font-bold text-[#f0a25c] tracking-wider pointer-events-none shadow-md"
                 >
                   0%
                 </div>
               </>
             )}
 
-            <div className="w-6 h-6 rounded-full border border-[#f0a25c] bg-[#10111c]/70 backdrop-blur-md flex items-center justify-center">
-              <div className="w-2 h-2 rounded-full bg-[#f0a25c] animate-ping" />
-              <div className="w-1.5 h-1.5 rounded-full bg-white absolute" />
+            {/* Pointer Dot with purely circular radial glow (zero rectangular border artifacts) */}
+            <div className="relative w-6 h-6 rounded-full border-2 border-[#f0a25c] bg-[#10111c] shadow-[0_0_16px_rgba(240,162,92,0.9)] flex items-center justify-center">
+              <div className="w-2.5 h-2.5 rounded-full bg-[#f0a25c] animate-ping opacity-60" />
+              <div className="w-2 h-2 rounded-full bg-white absolute shadow-[0_0_6px_#ffffff]" />
             </div>
           </div>
         </div>
@@ -1725,13 +1578,15 @@ export default function BoothPage() {
               })}
             </div>
 
-            <button
-              onClick={() => setStep("gesture_tutorial")}
-              className="text-[#9b9eaf] hover:text-white font-mono-tech text-xs tracking-wider uppercase transition-colors flex items-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Kembali ke Latihan Sensor
-            </button>
+            <div className="mb-8 sm:mb-12 pb-2">
+              <button
+                onClick={() => setStep("gesture_tutorial")}
+                className="text-[#9b9eaf] hover:text-white font-mono-tech text-xs tracking-wider uppercase transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+              >
+                <ArrowLeft className="w-4 h-4 shrink-0" />
+                <span>Kembali</span>
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1760,7 +1615,7 @@ export default function BoothPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-4xl w-full my-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl w-full my-auto">
               {FORMATS.map((fmt) => {
                 const isHovered = hoveredItemId === fmt.id;
                 const isLocked = lockedSelectionId === fmt.id;
@@ -1786,16 +1641,22 @@ export default function BoothPage() {
                     )}
 
                     <div>
-                      <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center justify-between mb-2">
                         <h3 className="text-xl font-bold text-white">{fmt.name}</h3>
                         <div className="w-8 h-8 rounded-lg bg-[#171927] flex items-center justify-center border border-[#292b3b]">
                           <Layers className="w-4 h-4 text-[#246cff]" />
                         </div>
                       </div>
 
-                      <span className="font-mono-tech text-xs text-[#f0a25c] font-semibold block mb-3">
-                        Rasio {fmt.ratio}
-                      </span>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="font-mono-tech text-xs text-[#f0a25c] font-semibold">
+                          Rasio {fmt.ratio}
+                        </span>
+                        <span className="text-[#9b9eaf] text-xs">•</span>
+                        <span className="font-mono-tech text-xs text-[#9b9eaf]">
+                          {fmt.dimensions}
+                        </span>
+                      </div>
 
                       <p className="text-xs text-[#9b9eaf] leading-relaxed mb-6">
                         {fmt.description}
@@ -1832,13 +1693,15 @@ export default function BoothPage() {
               })}
             </div>
 
-            <button
-              onClick={() => setStep("select_package")}
-              className="text-[#9b9eaf] hover:text-white font-mono-tech text-xs tracking-wider uppercase transition-colors flex items-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Kembali ke Pilih Paket
-            </button>
+            <div className="mb-8 sm:mb-12 pb-2">
+              <button
+                onClick={() => setStep("select_package")}
+                className="text-[#9b9eaf] hover:text-white font-mono-tech text-xs tracking-wider uppercase transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+              >
+                <ArrowLeft className="w-4 h-4 shrink-0" />
+                <span>Kembali</span>
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1860,162 +1723,151 @@ export default function BoothPage() {
                 <span>Langkah 3 Dari 3</span>
               </div>
               <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
-                Pilih Tema Bingkai Visual
+                Pilih Bingkai Foto ({selectedFormat?.name || "Semua"})
               </h2>
               <p className="text-[#9b9eaf] text-xs sm:text-sm mt-0.5">
-                Gunakan tombol navigasi ◀ / ▶ atau sentuh kartu untuk memilih
+                Pilih desain frame favorit untuk dicetak langsung pada kertas foto
               </p>
             </div>
 
-            {/* Template Cards Grid with 3 items per page */}
-            <div className="relative w-full max-w-5xl my-auto flex items-center justify-between gap-3">
-              {/* Previous Page Button (Can be hovered with gesture or clicked) */}
-              <button
-                data-dwell-id="prev_theme"
-                onClick={() => setThemePage((prev) => Math.max(0, prev - 1))}
-                disabled={themePage === 0}
-                className={`p-3 rounded-2xl border transition-all flex items-center justify-center ${themePage === 0
-                  ? "opacity-30 cursor-not-allowed border-[#292b3b] text-[#9b9eaf]"
-                  : "bg-[#10111c]/90 hover:bg-[#171927] border-[#292b3b] text-white shadow-xl hover:border-[#f0a25c]"
-                  }`}
-                title="Halaman Sebelumnya"
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </button>
+            {/* Template Cards Grid filtered by selectedFormat */}
+            {(() => {
+              const availableFrames = FRAMES.filter(
+                (f) => !selectedFormat || f.formatId === selectedFormat.id
+              );
+              const maxPerPage = 3;
+              const totalPages = Math.ceil(availableFrames.length / maxPerPage) || 1;
+              const pagedFrames = availableFrames.slice(
+                themePage * maxPerPage,
+                themePage * maxPerPage + maxPerPage
+              );
 
-              {/* Displayed Themes for Current Page */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 flex-1">
-                {THEMES.slice(themePage * 3, themePage * 3 + 3).map((thm) => {
-                  const isHovered = hoveredItemId === thm.id;
-                  const isLocked = lockedSelectionId === thm.id;
-
-                  return (
-                    <motion.div
-                      key={thm.id}
-                      data-dwell-id={thm.id}
-                      onClick={() => handleSelectTheme(thm)}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      className={`relative rounded-2xl p-5 cursor-pointer transition-all duration-200 text-left flex flex-col justify-between border ${isLocked
-                        ? "bg-[#10111c]/95 border-emerald-400 ring-2 ring-emerald-400/50 shadow-2xl backdrop-blur-md"
-                        : isHovered
-                          ? "bg-[#10111c]/95 border-[#f0a25c] ring-2 ring-[#f0a25c]/40 shadow-xl backdrop-blur-md"
-                          : "bg-[#10111c]/85 border-[#292b3b] hover:border-[#3b3e5b] backdrop-blur-md"
+              return (
+                <div className="relative w-full max-w-5xl my-auto flex items-center justify-between gap-3">
+                  {/* Previous Page Button */}
+                  {totalPages > 1 && (
+                    <button
+                      data-dwell-id="prev_theme"
+                      onClick={() => setThemePage((prev) => Math.max(0, prev - 1))}
+                      disabled={themePage === 0}
+                      className={`p-3 rounded-2xl border transition-all flex items-center justify-center ${themePage === 0
+                        ? "opacity-30 cursor-not-allowed border-[#292b3b] text-[#9b9eaf]"
+                        : "bg-[#10111c]/90 hover:bg-[#171927] border-[#292b3b] text-white shadow-xl hover:border-[#f0a25c]"
                         }`}
+                      title="Halaman Sebelumnya"
                     >
-                      {/* MINI VISUAL PHOTOSTRIP FRAME MOCKUP */}
-                      <div
-                        className="w-full aspect-[4/3] rounded-xl mb-3 border-2 p-2 flex flex-col justify-between overflow-hidden shadow-inner relative"
-                        style={{
-                          backgroundColor: thm.bgHex,
-                          borderColor: thm.borderHex,
-                        }}
-                      >
-                        {/* Mini Header in mockup */}
-                        <div className="flex items-center justify-between border-b pb-1" style={{ borderColor: thm.borderHex }}>
-                          <span
-                            className="font-mono-tech text-[8px] uppercase font-bold tracking-wider"
-                            style={{ color: thm.accentHex }}
-                          >
-                            AI BOX
-                          </span>
-                          <span
-                            className="font-mono-tech text-[7px] uppercase"
-                            style={{ color: thm.accentHex }}
-                          >
-                            HD 300 DPI
-                          </span>
-                        </div>
+                      <ChevronLeft className="w-6 h-6" />
+                    </button>
+                  )}
 
-                        {/* Simulated Photo Placeholders */}
-                        <div className="grid grid-cols-2 gap-1.5 my-auto">
-                          <div className="aspect-[4/3] rounded bg-white/10 flex items-center justify-center border border-white/10">
-                            <Camera className="w-3 h-3 text-white/40" />
-                          </div>
-                          <div className="aspect-[4/3] rounded bg-white/10 flex items-center justify-center border border-white/10">
-                            <Camera className="w-3 h-3 text-white/40" />
-                          </div>
-                        </div>
+                  {/* Displayed Themes for Current Format */}
+                  <div
+                    className={`grid gap-5 flex-1 ${pagedFrames.length === 2
+                      ? "grid-cols-1 md:grid-cols-2 max-w-2xl mx-auto"
+                      : "grid-cols-1 md:grid-cols-3"
+                      }`}
+                  >
+                    {pagedFrames.map((thm) => {
+                      const isHovered = hoveredItemId === thm.id;
+                      const isLocked = lockedSelectionId === thm.id;
 
-                        {/* Mini Footer */}
-                        <div className="flex items-center justify-between pt-1 border-t" style={{ borderColor: thm.borderHex }}>
-                          <span className="text-[7px]" style={{ color: thm.textHex }}>
-                            {thm.name}
-                          </span>
-                          <span
-                            className="w-2 h-2 rounded-full"
-                            style={{ backgroundColor: thm.accentHex }}
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <h3 className="text-base font-bold text-white mb-0.5">{thm.name}</h3>
-                        <p className="text-[11px] text-[#9b9eaf] leading-relaxed mb-3">
-                          {thm.description}
-                        </p>
-                      </div>
-
-                      <div>
-                        {isHovered && !isLocked && (
-                          <div className="w-full bg-[#090a12] h-1.5 rounded-full overflow-hidden mb-2">
-                            <div
-                              className="dwell-bar bg-[#f0a25c] h-full transition-all duration-75"
-                              style={{ width: "0%" }}
-                            />
-                          </div>
-                        )}
-
-                        <div
-                          className={`w-full py-2 rounded-xl font-semibold text-xs tracking-wider uppercase text-center transition-all ${isLocked
-                            ? "bg-emerald-500 text-white font-bold"
+                      return (
+                        <motion.div
+                          key={thm.id}
+                          data-dwell-id={thm.id}
+                          onClick={() => handleSelectTheme(thm)}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className={`relative rounded-2xl p-5 cursor-pointer transition-all duration-200 text-left flex flex-col justify-between border group ${isLocked
+                            ? "bg-[#10111c]/95 border-emerald-400 ring-2 ring-emerald-400/50 shadow-2xl backdrop-blur-md"
                             : isHovered
-                              ? "bg-[#f0a25c] text-[#090a12] font-bold"
-                              : "bg-[#171927] text-white border border-[#292b3b]"
+                              ? "bg-[#10111c]/95 border-[#f0a25c] ring-2 ring-[#f0a25c]/40 shadow-xl backdrop-blur-md"
+                              : "bg-[#10111c]/85 border-[#292b3b] hover:border-[#3b3e5b] backdrop-blur-md"
                             }`}
                         >
-                          {isLocked
-                            ? "✓ Tema Dipilih!"
-                            : isHovered
-                              ? <span className="dwell-label">Mengunci (0%)...</span>
-                              : "Pilih Tema"}
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
+                          {thm.badge && (
+                            <span className="absolute -top-3 right-4 px-2.5 py-0.5 bg-[#f0a25c] text-[#090a12] font-bold text-[10px] tracking-wider uppercase rounded-md shadow-sm z-10">
+                              {thm.badge}
+                            </span>
+                          )}
 
-              {/* Next Page Button */}
-              <button
-                data-dwell-id="next_theme"
-                onClick={() => setThemePage((prev) => Math.min(1, prev + 1))}
-                disabled={themePage === 1}
-                className={`p-3 rounded-2xl border transition-all flex items-center justify-center ${themePage === 1
-                  ? "opacity-30 cursor-not-allowed border-[#292b3b] text-[#9b9eaf]"
-                  : "bg-[#10111c]/90 hover:bg-[#171927] border-[#292b3b] text-white shadow-xl hover:border-[#f0a25c]"
-                  }`}
-                title="Halaman Selanjutnya"
-              >
-                <ChevronRight className="w-6 h-6" />
-              </button>
-            </div>
+                          {/* REAL VISUAL FRAME PREVIEW THUMBNAIL */}
+                          <div className="w-full h-48 rounded-xl mb-3 bg-[#090a12]/95 border border-[#292b3b] overflow-hidden shadow-inner relative flex items-center justify-center p-2 group-hover:border-[#f0a25c]/50 transition-colors">
+                            <img
+                              src={thm.frameSrc}
+                              alt={thm.name}
+                              className="h-full object-contain filter drop-shadow-md transition-transform duration-300 group-hover:scale-105"
+                            />
+                            <span className="absolute top-2 right-2 px-2 py-0.5 rounded bg-[#090a12]/80 border border-[#292b3b] text-[10px] font-mono-tech text-[#f0a25c] backdrop-blur-sm">
+                              {thm.slots.length} Foto
+                            </span>
+                          </div>
 
-            {/* Pagination Dots & Navigation */}
-            <div className="flex items-center gap-3">
+                          <div>
+                            <h3 className="text-base font-bold text-white mb-0.5">{thm.name}</h3>
+                            <p className="text-[11px] text-[#9b9eaf] leading-relaxed mb-3">
+                              {thm.description}
+                            </p>
+                          </div>
+
+                          <div>
+                            {isHovered && !isLocked && (
+                              <div className="w-full bg-[#090a12] h-1.5 rounded-full overflow-hidden mb-2">
+                                <div
+                                  className="dwell-bar bg-[#f0a25c] h-full transition-all duration-75"
+                                  style={{ width: "0%" }}
+                                />
+                              </div>
+                            )}
+
+                            <div
+                              className={`w-full py-2 rounded-xl font-semibold text-xs tracking-wider uppercase text-center transition-all ${isLocked
+                                ? "bg-emerald-500 text-white font-bold"
+                                : isHovered
+                                  ? "bg-[#f0a25c] text-[#090a12] font-bold"
+                                  : "bg-[#171927] text-white border border-[#292b3b]"
+                                }`}
+                            >
+                              {isLocked
+                                ? "✓ Bingkai Dipilih!"
+                                : isHovered
+                                  ? <span className="dwell-label">Mengunci (0%)...</span>
+                                  : "Pilih Bingkai"}
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Next Page Button */}
+                  {totalPages > 1 && (
+                    <button
+                      data-dwell-id="next_theme"
+                      onClick={() => setThemePage((prev) => Math.min(totalPages - 1, prev + 1))}
+                      disabled={themePage >= totalPages - 1}
+                      className={`p-3 rounded-2xl border transition-all flex items-center justify-center ${themePage >= totalPages - 1
+                        ? "opacity-30 cursor-not-allowed border-[#292b3b] text-[#9b9eaf]"
+                        : "bg-[#10111c]/90 hover:bg-[#171927] border-[#292b3b] text-white shadow-xl hover:border-[#f0a25c]"
+                        }`}
+                      title="Halaman Selanjutnya"
+                    >
+                      <ChevronRight className="w-6 h-6" />
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Navigation back */}
+            <div className="mb-8 sm:mb-12 pb-2">
               <button
                 onClick={() => setStep("select_format")}
-                className="text-[#9b9eaf] hover:text-white font-mono-tech text-xs tracking-wider uppercase transition-colors flex items-center gap-2"
+                className="text-[#9b9eaf] hover:text-white font-mono-tech text-xs tracking-wider uppercase transition-colors inline-flex items-center gap-2 whitespace-nowrap"
               >
-                <ArrowLeft className="w-4 h-4" />
-                Kembali ke Format
+                <ArrowLeft className="w-4 h-4 shrink-0" />
+                <span>Kembali</span>
               </button>
-
-              <div className="flex items-center gap-1.5 px-3 py-1 bg-[#10111c] border border-[#292b3b] rounded-lg">
-                <span className="font-mono-tech text-[10px] text-[#9b9eaf]">
-                  Koleksi Tema: <strong className="text-white">{themePage + 1} / 2</strong>
-                </span>
-              </div>
             </div>
           </motion.div>
         )}
@@ -2100,7 +1952,7 @@ export default function BoothPage() {
           >
             <div className="mt-8 px-6 py-2 rounded-xl bg-[#10111c]/85 backdrop-blur-md border border-[#292b3b] shadow-lg">
               <span className="font-mono-tech text-xs text-[#f0a25c] uppercase font-bold tracking-widest">
-                POSE {currentPoseIndex + 1} DARI {selectedPkg?.poses || 3}
+                SESI FOTO • {selectedTheme?.defaultPoses || selectedTheme?.slots?.length || selectedPkg?.poses || 3} POSE
               </span>
             </div>
 
@@ -2113,20 +1965,20 @@ export default function BoothPage() {
                 Bersiap Berpose!
               </h2>
               <p className="text-[#9b9eaf] text-xs sm:text-sm leading-relaxed mb-5">
-                Beri gestur Peace ✌️ ke arah kamera atau sentuh tombol di bawah untuk memulai
-                hitung mundur 3 detik.
+                Kamera akan mengambil otomatis {selectedTheme?.defaultPoses || selectedTheme?.slots?.length || selectedPkg?.poses || 3} pose berturut-turut.
+                Beri gestur Peace ✌️ atau klik tombol untuk mulai.
               </p>
 
               <button
                 onClick={() => setStep("countdown")}
-                className="w-full py-3.5 bg-[#246cff] hover:bg-[#4d87ff] text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg shadow-[#246cff]/25 transition-all inline-flex items-center justify-center gap-2"
+                className="w-full py-3.5 bg-[#246cff] hover:bg-[#4d87ff] text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg shadow-[#246cff]/25 transition-all inline-flex items-center justify-center gap-2 whitespace-nowrap"
               >
-                <Camera className="w-4 h-4" />
-                <span>Mulai Foto Sekarang (3s)</span>
+                <Camera className="w-4 h-4 shrink-0" />
+                <span>Mulai Foto</span>
               </button>
             </div>
 
-            <div className="h-8" />
+            <div className="mb-8 sm:mb-14 pb-2" />
           </motion.div>
         )}
       </AnimatePresence>
@@ -2143,26 +1995,51 @@ export default function BoothPage() {
             exit={{ opacity: 0 }}
             className="absolute inset-0 z-40 flex flex-col items-center justify-center"
           >
-            <motion.div
-              key={photoCountdown}
-              initial={{ scale: 1.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.5, opacity: 0 }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-              className="text-8xl sm:text-9xl font-black text-white font-mono-tech drop-shadow-[0_0_40px_rgba(240,162,92,0.6)]"
-            >
-              {photoCountdown > 0 ? photoCountdown : "SMILE!"}
-            </motion.div>
+            {isCompositingPreview ? (
+              <div className="flex flex-col items-center gap-4 bg-[#10111c]/90 px-8 py-6 rounded-2xl border border-[#292b3b] backdrop-blur-md shadow-2xl">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="w-10 h-10 border-3 border-[#f0a25c] border-t-transparent rounded-full"
+                />
+                <span className="text-white font-bold text-base">Merangkai Foto & Bingkai...</span>
+              </div>
+            ) : isIntermission ? (
+              <div className="flex flex-col items-center gap-2 bg-[#10111c]/90 px-8 py-6 rounded-2xl border border-[#292b3b] backdrop-blur-md shadow-2xl text-center">
+                <span className="text-[#f0a25c] font-bold text-lg uppercase tracking-wider">
+                  Ganti Gaya Berikutnya!
+                </span>
+                <span className="text-white text-xs">
+                  Pose {currentPoseIndex + 2} dari {selectedTheme?.defaultPoses || selectedTheme?.slots?.length || 3}
+                </span>
+                <span className="text-5xl font-black font-mono-tech text-white mt-1">
+                  {intermissionCountdown}
+                </span>
+              </div>
+            ) : (
+              <>
+                <motion.div
+                  key={photoCountdown}
+                  initial={{ scale: 1.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.5, opacity: 0 }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                  className="text-8xl sm:text-9xl font-black text-white font-mono-tech drop-shadow-[0_0_40px_rgba(240,162,92,0.6)]"
+                >
+                  {photoCountdown > 0 ? photoCountdown : "SMILE!"}
+                </motion.div>
 
-            <span className="font-mono-tech text-xs text-[#f0a25c] tracking-widest uppercase mt-4 px-3 py-1 bg-[#10111c]/80 rounded-lg">
-              POSE {currentPoseIndex + 1} DARI {selectedPkg?.poses || 3}
-            </span>
+                <span className="font-mono-tech text-xs text-[#f0a25c] tracking-widest uppercase mt-4 px-3 py-1 bg-[#10111c]/80 rounded-lg">
+                  POSE {currentPoseIndex + 1} DARI {selectedTheme?.defaultPoses || selectedTheme?.slots?.length || 3}
+                </span>
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* ========================================================================= */}
-      {/* ===== STEP 9: PREVIEW / RETAKE (80-90% OPACITY OVERLAY) ================= */}
+      {/* ===== STEP 9: PREVIEW / RETAKE (FOTO + FRAME COMPOSITE) ================= */}
       {/* ========================================================================= */}
       <AnimatePresence>
         {step === "preview_retake" && (
@@ -2171,50 +2048,55 @@ export default function BoothPage() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="absolute inset-0 z-30 bg-[#090a12]/80 backdrop-blur-md flex flex-col items-center justify-between p-6 sm:p-10 text-center"
+            className="absolute inset-0 z-30 bg-[#090a12]/85 backdrop-blur-md flex flex-col items-center justify-between p-6 sm:p-8 text-center"
           >
-            <div className="mt-4">
-              <h2 className="text-3xl font-bold text-white tracking-tight">
+            <div className="mt-2">
+              <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
                 Preview Hasil Foto
               </h2>
-              <p className="text-[#9b9eaf] text-xs sm:text-sm mt-1">
-                Periksa hasil tangkapan pose Anda. Anda dapat mengulangi jika belum puas.
+              <p className="text-[#9b9eaf] text-xs sm:text-sm mt-0.5">
+                Foto Anda telah dipasang ke dalam bingkai pilihan
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-4 max-w-4xl w-full my-auto overflow-y-auto max-h-[55vh] p-2">
-              {capturedPhotos.map((photoUrl, idx) => (
-                <div
-                  key={idx}
-                  className="relative rounded-xl overflow-hidden border border-[#292b3b] shadow-lg w-44 sm:w-52 aspect-[4/3] bg-[#10111c]/90"
-                >
+            {/* Assembled Photostrip (Photo + Frame) Preview */}
+            <div className="my-auto flex items-center justify-center max-w-full max-h-[50vh] p-2">
+              {previewStripUrl || photostripBase64Ref.current ? (
+                <div className="relative rounded-2xl overflow-hidden shadow-2xl border-2 border-[#292b3b] bg-[#10111c]/90 max-h-[48vh] flex items-center justify-center p-1.5">
                   <img
-                    src={photoUrl}
-                    alt={`Pose ${idx + 1}`}
-                    className="w-full h-full object-cover"
+                    src={previewStripUrl || photostripBase64Ref.current}
+                    alt="Hasil Foto dan Frame"
+                    className="max-h-[46vh] object-contain rounded-xl shadow-lg"
                   />
-                  <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-[#090a12]/80 text-[10px] font-mono-tech text-white">
-                    Pose {idx + 1}
-                  </span>
                 </div>
-              ))}
+              ) : (
+                <div className="flex flex-col items-center gap-3 p-8">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="w-10 h-10 border-3 border-[#f0a25c] border-t-transparent rounded-full"
+                  />
+                  <span className="text-white text-sm">Merangkai preview bingkai...</span>
+                </div>
+              )}
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 w-full max-w-md">
+            {/* Ergonomic Lifted 1-Row Action Buttons */}
+            <div className="flex flex-row items-center justify-center gap-4 w-full max-w-md mb-8 sm:mb-14 pb-2">
               <button
                 onClick={handleRetake}
-                className="w-full sm:w-auto px-6 py-3 bg-[#171927]/90 hover:bg-[#202336] text-white rounded-xl border border-[#292b3b] font-semibold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2"
+                className="flex-1 px-6 py-3.5 bg-[#171927]/90 hover:bg-[#202336] text-white rounded-xl border border-[#292b3b] font-semibold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2 whitespace-nowrap shadow-md"
               >
-                <RotateCcw className="w-4 h-4 text-rose-400" />
-                <span>Foto Ulang (Retake)</span>
+                <RotateCcw className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>Foto Ulang</span>
               </button>
 
               <button
                 onClick={handleConfirmPreview}
-                className="w-full sm:w-auto px-7 py-3 bg-[#246cff] hover:bg-[#4d87ff] text-white rounded-xl font-bold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#246cff]/25"
+                className="flex-1 px-7 py-3.5 bg-[#246cff] hover:bg-[#4d87ff] text-white rounded-xl font-bold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#246cff]/25 whitespace-nowrap"
               >
-                <Check className="w-4 h-4" />
-                <span>Lanjut Cetak & Simpan</span>
+                <Check className="w-4 h-4 shrink-0" />
+                <span>Lanjut Cetak</span>
               </button>
             </div>
           </motion.div>
@@ -2320,14 +2202,14 @@ export default function BoothPage() {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 w-full max-w-md">
+            <div className="flex flex-row items-center justify-center gap-4 w-full max-w-md mb-8 sm:mb-14 pb-2">
               <button
                 disabled={isPrinting}
                 onClick={handleSimulatePrint}
-                className="w-full sm:w-auto px-7 py-3 bg-[#f0a25c] hover:bg-[#ff7b00] text-[#090a12] rounded-xl font-bold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2 shadow-lg"
+                className="flex-1 px-7 py-3.5 bg-[#f0a25c] hover:bg-[#ff7b00] text-[#090a12] rounded-xl font-bold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2 shadow-lg whitespace-nowrap"
               >
-                <Printer className="w-4 h-4" />
-                <span>{isPrinting ? "Mencetak Foto..." : `Cetak ${printCopies} Lembar`}</span>
+                <Printer className="w-4 h-4 shrink-0" />
+                <span>{isPrinting ? "Mencetak..." : "Cetak Foto"}</span>
               </button>
 
               <button
@@ -2335,9 +2217,9 @@ export default function BoothPage() {
                   handleStartDriveUpload();
                   setStep("upload_digital");
                 }}
-                className="w-full sm:w-auto px-6 py-3 bg-[#171927] hover:bg-[#202336] text-white rounded-xl border border-[#292b3b] font-semibold text-xs tracking-wider uppercase transition-all"
+                className="flex-1 px-6 py-3.5 bg-[#171927] hover:bg-[#202336] text-white rounded-xl border border-[#292b3b] font-semibold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2 whitespace-nowrap"
               >
-                Lewati Cetak Fisik ➔
+                <span>Lewati Cetak</span>
               </button>
             </div>
           </motion.div>
@@ -2356,7 +2238,7 @@ export default function BoothPage() {
             exit={{ opacity: 0, scale: 0.94 }}
             className="absolute inset-0 z-40 bg-[#090a12]/80 backdrop-blur-md flex items-center justify-center p-4"
           >
-            <div className="bg-[#10111c]/90 backdrop-blur-lg rounded-2xl p-7 max-w-md w-full text-center border border-[#292b3b] shadow-2xl">
+            <div className="bg-[#10111c]/90 backdrop-blur-lg rounded-2xl p-7 max-w-md w-full text-center border border-[#292b3b] shadow-2xl mb-8 sm:mb-12">
               <div className="w-12 h-12 rounded-xl bg-[#246cff]/15 text-[#246cff] border border-[#246cff]/30 flex items-center justify-center mx-auto mb-3">
                 <Mail className="w-6 h-6" />
               </div>
@@ -2393,12 +2275,12 @@ export default function BoothPage() {
                 </p>
               )}
 
-              <div className="flex gap-2.5">
+              <div className="flex flex-row gap-3">
                 <button
                   onClick={() => setStep("qr_download")}
-                  className="flex-1 py-3 bg-[#171927] hover:bg-[#202336] text-[#9b9eaf] hover:text-white rounded-xl text-xs font-semibold uppercase tracking-wider border border-[#292b3b] transition-all"
+                  className="flex-1 py-3.5 bg-[#171927] hover:bg-[#202336] text-[#9b9eaf] hover:text-white rounded-xl text-xs font-semibold uppercase tracking-wider border border-[#292b3b] transition-all whitespace-nowrap"
                 >
-                  Lewati Email
+                  Lewati
                 </button>
 
                 <button
@@ -2406,9 +2288,9 @@ export default function BoothPage() {
                     handleSendEmail(emailInput);
                     setStep("qr_download");
                   }}
-                  className="flex-1 py-3 bg-[#246cff] hover:bg-[#4d87ff] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-md shadow-[#246cff]/25"
+                  className="flex-1 py-3.5 bg-[#246cff] hover:bg-[#4d87ff] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-md shadow-[#246cff]/25 whitespace-nowrap"
                 >
-                  Kirim & Download
+                  Kirim Email
                 </button>
               </div>
             </div>
@@ -2428,7 +2310,7 @@ export default function BoothPage() {
             exit={{ opacity: 0, scale: 0.94 }}
             className="absolute inset-0 z-40 bg-[#090a12]/80 backdrop-blur-md flex items-center justify-center p-4"
           >
-            <div className="bg-[#10111c]/90 backdrop-blur-lg rounded-2xl p-7 max-w-sm w-full text-center border border-[#292b3b] shadow-2xl">
+            <div className="bg-[#10111c]/90 backdrop-blur-lg rounded-2xl p-7 max-w-sm w-full text-center border border-[#292b3b] shadow-2xl mb-8 sm:mb-12">
               <div className="w-12 h-12 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto mb-3">
                 <Download className="w-6 h-6" />
               </div>
@@ -2458,9 +2340,9 @@ export default function BoothPage() {
 
               <button
                 onClick={() => setStep("thank_you")}
-                className="w-full py-3 bg-[#246cff] hover:bg-[#4d87ff] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-md shadow-[#246cff]/25"
+                className="w-full py-3.5 bg-[#246cff] hover:bg-[#4d87ff] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-md shadow-[#246cff]/25 whitespace-nowrap"
               >
-                Selesai & Ambil Foto ➔
+                Selesai
               </button>
             </div>
           </motion.div>

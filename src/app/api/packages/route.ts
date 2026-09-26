@@ -4,7 +4,7 @@ import { adminDb } from "@/lib/firebase-admin";
 export async function GET() {
   try {
     const snapshot = await adminDb.collection("packages").get();
-    const packages = snapshot.docs.map((doc) => ({
+    const packages = snapshot.docs.map((doc: any) => ({
       id: doc.id,
       ...doc.data(),
     }));
