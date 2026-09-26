@@ -253,7 +253,7 @@ export default function BoothPage() {
   const [qrisTimer, setQrisTimer] = useState(5);
   const [photoCountdown, setPhotoCountdown] = useState(3);
   const [isIntermission, setIsIntermission] = useState(false);
-  const [intermissionCountdown, setIntermissionCountdown] = useState(2);
+  const [intermissionCountdown, setIntermissionCountdown] = useState(3);
   const [previewStripUrl, setPreviewStripUrl] = useState<string>("");
   const [isCompositingPreview, setIsCompositingPreview] = useState(false);
   const smoothedLandmarksRef = useRef<any[] | null>(null);
@@ -977,10 +977,10 @@ export default function BoothPage() {
 
           // Check if more poses needed for this frame
           if (collected.length < totalPoses && !cancelled) {
-            // Short 2s intermission to change pose
+            // 3s intermission to change pose
             setIsIntermission(true);
-            setIntermissionCountdown(2);
-            let interSec = 2;
+            setIntermissionCountdown(3);
+            let interSec = 3;
 
             timer = setInterval(() => {
               if (cancelled) {

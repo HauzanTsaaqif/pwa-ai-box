@@ -13,6 +13,7 @@ import {
   Cpu,
   ChevronRight,
   Sparkles,
+  ArrowUpRight,
 } from "lucide-react";
 import Logo from "@/components/Logo";
 
@@ -513,39 +514,77 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== EVENT BOOKING CTA ===== */}
-      <section id="sewa" className="py-24 px-4 sm:px-6 max-w-4xl mx-auto">
-        <div className="bg-[#10111c] rounded-2xl p-8 sm:p-12 border border-[#292b3b] text-center relative overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+      {/* ===== EVENT BOOKING CTA (MINIMALIST LUXE) ===== */}
+      <section id="sewa" className="py-24 px-4 sm:px-6 max-w-4xl mx-auto relative">
+        {/* Subtle Ambient Aurora Light */}
+        <div className="absolute inset-0 max-w-xl mx-auto bg-gradient-to-r from-[#f0a25c]/15 via-[#246cff]/15 to-[#f0a25c]/15 blur-3xl opacity-40 pointer-events-none -z-10" />
 
-          <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-[-0.04em] mb-4">
-            Hadirkan AI Box di Acara Spesial Anda!
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="relative bg-[#10111c]/90 backdrop-blur-xl rounded-3xl p-8 sm:p-14 border border-[#292b3b] hover:border-[#f0a25c]/40 transition-colors duration-500 text-center shadow-[0_20px_60px_rgba(0,0,0,0.6)] group overflow-hidden"
+        >
+          {/* Subtle Top Border Sheen */}
+          <div className="absolute top-0 left-1/4 right-1/4 h-[1px] bg-gradient-to-r from-transparent via-[#f0a25c]/40 to-transparent pointer-events-none" />
+
+          {/* Minimalist Occasion Tags */}
+          <div className="flex flex-wrap items-center justify-center gap-2 mb-6">
+            {["Pernikahan", "Ulang Tahun", "Gathering Perusahaan", "Brand Expo"].map((item) => (
+              <span
+                key={item}
+                className="px-3.5 py-1 rounded-full bg-[#171927] border border-[#292b3b] text-[11px] font-mono-tech text-[#9b9eaf] tracking-wide hover:text-white hover:border-[#f0a25c]/40 transition-colors select-none"
+              >
+                {item}
+              </span>
+            ))}
+          </div>
+
+          {/* Headline */}
+          <h2 className="text-3xl sm:text-5xl font-bold text-white tracking-[-0.04em] mb-4">
+            Hadirkan <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-[#f0a25c] to-white">AI Box</span> di Acara Spesial Anda!
           </h2>
-          <p className="text-[#9b9eaf] text-sm sm:text-base max-w-lg mx-auto mb-8 leading-relaxed">
-            Tersedia untuk rental Pernikahan, Ulang Tahun, Gathering Perusahaan, dan Brand Expo.
-            Konsultasikan tema bingkai kustom dan kebutuhan hardware booth Anda bersama kami.
+
+          {/* Concise, human, elegant copy */}
+          <p className="text-[#9b9eaf] text-sm sm:text-base max-w-lg mx-auto mb-9 leading-relaxed font-normal">
+            Tersedia untuk rental berbagai momen istimewa. Konsultasikan tema bingkai kustom dan kebutuhan hardware booth Anda bersama kami.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5">
+          {/* Luxury CTA Actions */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 w-full sm:w-auto">
             <motion.a
-              href="https://wa.me/6281234567890?text=Halo%20AI%20Box%2C%20saya%20tertarik%20untuk%20menyewa%20photobooth"
+              href="https://wa.me/6281234567890?text=Halo%20AI%20Box%2C%20saya%20tertarik%20konsultasi%20rental%20photobooth%20untuk%20acara%20kami"
               target="_blank"
               rel="noopener noreferrer"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="w-full sm:w-auto px-7 py-3.5 bg-[#246cff] hover:bg-[#4d87ff] text-white font-semibold text-sm rounded-xl shadow-[0_8px_20px_rgba(36,108,255,0.25)] transition-all flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-8 py-3.5 bg-[#246cff] hover:bg-[#3d7eff] text-white font-semibold text-sm rounded-xl transition-all shadow-[0_10px_25px_rgba(36,108,255,0.3)] flex items-center justify-center gap-2.5 whitespace-nowrap"
             >
-              <MessageCircle className="w-4 h-4" />
+              <MessageCircle className="w-4 h-4 fill-white" />
               <span>Hubungi via WhatsApp</span>
+              <ArrowUpRight className="w-4 h-4 opacity-75" />
             </motion.a>
 
-            <Link href="/booth">
-              <span className="w-full sm:w-auto px-6 py-3.5 bg-[#171927] hover:bg-[#202336] text-white border border-[#292b3b] text-xs font-semibold uppercase tracking-wider rounded-xl transition-all inline-flex items-center justify-center gap-2 cursor-pointer">
+            <Link href="/booth" className="w-full sm:w-auto">
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full sm:w-auto px-7 py-3.5 bg-[#171927] hover:bg-[#202336] text-white border border-[#292b3b] text-sm font-medium rounded-xl transition-all flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer"
+              >
+                <Camera className="w-4 h-4 text-[#f0a25c]" />
                 <span>Coba Mode Booth</span>
-                <ChevronRight className="w-4 h-4 text-[#f0a25c]" />
-              </span>
+                <ChevronRight className="w-4 h-4 text-[#9b9eaf]" />
+              </motion.div>
             </Link>
           </div>
-        </div>
+
+          {/* Understated Status Footer */}
+          <div className="mt-8 pt-6 border-t border-[#292b3b]/60 inline-flex items-center gap-2 text-xs font-mono-tech text-[#9b9eaf]">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Reservasi Dibuka • Layanan On-Site Jabodetabek & Nasional</span>
+          </div>
+        </motion.div>
       </section>
 
       {/* ===== FOOTER ===== */}
