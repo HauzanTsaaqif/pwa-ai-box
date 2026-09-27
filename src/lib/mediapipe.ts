@@ -30,27 +30,44 @@ export class MediaPipeManager {
   private lastGesture: GestureType = "none";
   private gestureStableCount: number = 0;
   private onGestureCallback: ((gesture: GestureResult) => void) | null = null;
-  private targetFPS: number = 15;
-  private frameInterval: number = 1000 / 15;
+  private targetFPS: number = 30;
+  private frameInterval: number = 1000 / 30;
   private lastFrameTime: number = 0;
   private videoRef: HTMLVideoElement | null = null;
+
+  private isDetecting: boolean = false;
 
   static async create(): Promise<MediaPipeManager> {
     const manager = new MediaPipeManager();
     const vision = await FilesetResolver.forVisionTasks(
       "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm"
     );
-    manager.handLandmarker = await HandLandmarker.createFromOptions(vision, {
-      baseOptions: {
-        modelAssetPath:
-          "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-        delegate: "GPU",
-      },
-      runningMode: "VIDEO",
-      numHands: 2,
-      minHandDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.5,
-    });
+    try {
+      manager.handLandmarker = await HandLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+          delegate: "GPU",
+        },
+        runningMode: "VIDEO",
+        numHands: 1,
+        minHandDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+      });
+    } catch (err) {
+      console.warn("GPU delegate creation failed, fallback to CPU:", err);
+      manager.handLandmarker = await HandLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+          delegate: "CPU",
+        },
+        runningMode: "VIDEO",
+        numHands: 1,
+        minHandDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+      });
+    }
     return manager;
   }
 
@@ -92,13 +109,19 @@ export class MediaPipeManager {
       const elapsed = timestamp - this.lastFrameTime;
       if (
         elapsed >= this.frameInterval &&
+        !this.isDetecting &&
         this.handLandmarker &&
         this.videoRef &&
         this.videoRef.readyState >= 2 &&
         !this.videoRef.paused
       ) {
         this.lastFrameTime = timestamp;
-        this.detectGesture(timestamp);
+        this.isDetecting = true;
+        try {
+          this.detectGesture(timestamp);
+        } finally {
+          this.isDetecting = false;
+        }
       }
 
       this.animationId = requestAnimationFrame(loop);
@@ -122,6 +145,7 @@ export class MediaPipeManager {
           ? Math.round(timestamp)
           : Math.round(performance.now());
 
+      // Direct video feed inference to eliminate GPU->CPU->GPU texture readback stalls
       const result = this.handLandmarker.detectForVideo(
         this.videoRef,
         validTimestamp
@@ -156,6 +180,18 @@ export class MediaPipeManager {
             landmarks,
             handedness,
             confidence: result.handedness?.[0]?.[0]?.score ?? 0,
+          });
+        }
+      } else {
+        // Hand lost or offscreen: immediately notify callback so skeleton is wiped
+        this.lastGesture = "none";
+        this.gestureStableCount = 0;
+        if (this.onGestureCallback) {
+          this.onGestureCallback({
+            gesture: "none",
+            landmarks: [],
+            handedness: "Right",
+            confidence: 0,
           });
         }
       }
@@ -296,18 +332,21 @@ export class MediaPipeManager {
   }
 }
 
-// ===== HELPER: DRAW HAND SKELETON CANVAS FOR DEBUG MODE =====
+// ===== HELPER: HIGH-PERFORMANCE DUAL-PASS HAND SKELETON CANVAS =====
 export function drawHandSkeleton(
   ctx: CanvasRenderingContext2D,
   landmarks: NormalizedLandmark[],
   width: number,
   height: number,
-  gestureName: string = ""
+  _gestureName: string = ""
 ): void {
-  if (!landmarks || landmarks.length < 21) return;
-
   ctx.save();
   ctx.clearRect(0, 0, width, height);
+
+  if (!landmarks || landmarks.length < 21) {
+    ctx.restore();
+    return;
+  }
 
   const connections = [
     [0, 1], [0, 5], [5, 9], [9, 13], [13, 17], [0, 17],
@@ -318,62 +357,80 @@ export function drawHandSkeleton(
     [17, 18], [18, 19], [19, 20],
   ];
 
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = "#0ea5e9";
-  ctx.shadowColor = "#38bdf8";
-  ctx.shadowBlur = 8;
-
-  for (const [start, end] of connections) {
-    const p1 = landmarks[start];
-    const p2 = landmarks[end];
-    const x1 = (1 - p1.x) * width;
-    const y1 = p1.y * height;
-    const x2 = (1 - p2.x) * width;
-    const y2 = p2.y * height;
-
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
+  // Batch calculate screen positions once
+  const coords: { x: number; y: number }[] = new Array(21);
+  for (let i = 0; i < 21; i++) {
+    const lm = landmarks[i];
+    coords[i] = {
+      x: (1 - lm.x) * width,
+      y: lm.y * height,
+    };
   }
 
+  // --- PASS 1: AMBIENT NEON OUTER GLOW (Zero Gaussian Blur Overhead) ---
+  ctx.lineWidth = 5.5;
+  ctx.strokeStyle = "rgba(240, 162, 92, 0.28)";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  for (const [start, end] of connections) {
+    const p1 = coords[start];
+    const p2 = coords[end];
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+  }
+  ctx.stroke();
+
+  // --- PASS 2: SOLID CORE BONES ---
+  ctx.lineWidth = 2.2;
+  ctx.strokeStyle = "rgba(255, 230, 205, 0.95)";
+  ctx.beginPath();
+  for (const [start, end] of connections) {
+    const p1 = coords[start];
+    const p2 = coords[end];
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+  }
+  ctx.stroke();
+
+  // --- PASS 3: JOINT NODES & ACTIVE POINTER ---
   const tips = [4, 8, 12, 16, 20];
-  landmarks.forEach((lm, idx) => {
-    const x = (1 - lm.x) * width;
-    const y = lm.y * height;
+  for (let idx = 0; idx < 21; idx++) {
+    const p = coords[idx];
+    const isTip = tips.includes(idx);
 
-    ctx.beginPath();
-    ctx.arc(x, y, tips.includes(idx) ? 7 : 4, 0, 2 * Math.PI);
+    if (idx === 8) {
+      // Index finger tip (active cursor pointer): glowing halo ring + bright core
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 11, 0, 2 * Math.PI);
+      ctx.fillStyle = "rgba(240, 162, 92, 0.35)";
+      ctx.fill();
 
-    if (idx === 0) {
-      ctx.fillStyle = "#ef4444";
-    } else if (tips.includes(idx)) {
-      ctx.fillStyle = "#f97316";
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 5.5, 0, 2 * Math.PI);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "#f0a25c";
+      ctx.stroke();
+    } else if (isTip) {
+      // Fingertips: apricot glow + solid node
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 7, 0, 2 * Math.PI);
+      ctx.fillStyle = "rgba(240, 162, 92, 0.3)";
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 4, 0, 2 * Math.PI);
+      ctx.fillStyle = "#f0a25c";
+      ctx.fill();
     } else {
-      ctx.fillStyle = "#10b981";
+      // Knuckles and joints
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 2.8, 0, 2 * Math.PI);
+      ctx.fillStyle = "rgba(247, 247, 251, 0.85)";
+      ctx.fill();
     }
-
-    ctx.fill();
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = "#ffffff";
-    ctx.stroke();
-  });
-
-  // Render Debug Banner on TOP RIGHT so it does not block top-left status badges
-  if (gestureName) {
-    const boxWidth = 260;
-    const boxHeight = 36;
-    const boxX = width - boxWidth - 16;
-    const boxY = 16;
-
-    ctx.shadowBlur = 0;
-    ctx.font = "bold 14px Inter, monospace";
-    ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
-    ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
-    ctx.strokeStyle = "#0ea5e9";
-    ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
-    ctx.fillStyle = "#38bdf8";
-    ctx.fillText(`[DEBUG] Gesture: ${gestureName}`, boxX + 12, boxY + 24);
   }
 
   ctx.restore();

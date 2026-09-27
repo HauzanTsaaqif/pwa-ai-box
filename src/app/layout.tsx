@@ -1,25 +1,23 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
+const geistSans = Geist({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
-  variable: "--font-inter",
+  variable: "--font-geist-sans",
   display: "swap",
 });
 
-const jetbrainsMono = JetBrains_Mono({
+const geistMono = Geist_Mono({
   subsets: ["latin"],
-  weight: ["400"],
-  variable: "--font-mono",
+  variable: "--font-geist-mono",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "AI Box Photobooth",
+  title: "AI BOX, Capture!",
   description:
-    "AI-Powered Photobooth PWA — Gesture-controlled photo experience with instant digital delivery",
+    "The world's premier AI-powered photobooth with gesture control — built for effortless, unforgettable moments.",
   manifest: "/manifest.json",
   icons: {
     icon: "/icons/icon-192.svg",
@@ -38,7 +36,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#0F172A",
+  themeColor: "#090a12",
 };
 
 export default function RootLayout({
@@ -47,7 +45,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+    <html
+      lang="id"
+      className={`${geistSans.variable} ${geistMono.variable}`}
+    >
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -56,7 +57,9 @@ export default function RootLayout({
           content="black-translucent"
         />
       </head>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased bg-[#090a12] text-[#f7f7fb] selection:bg-[#ff7b00] selection:text-white">
+        {children}
+      </body>
     </html>
   );
 }
