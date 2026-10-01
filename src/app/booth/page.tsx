@@ -205,6 +205,10 @@ export default function BoothPage() {
   const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
   const capturedPhotosRef = useRef<string[]>([]);
   const [currentPoseIndex, setCurrentPoseIndex] = useState(0);
+  const currentPoseIndexRef = useRef(0);
+  const gestureMustResetRef = useRef(false);
+  const isProcessingPoseAdvanceRef = useRef(false);
+  const [isFramePreviewOpen, setIsFramePreviewOpen] = useState(true);
 
   // Gesture & Cursor Tracking State
   const [lastDetectedGesture, setLastDetectedGesture] = useState<GestureType>("none");
@@ -255,6 +259,8 @@ export default function BoothPage() {
   // Interactive Gesture Tutorial State
   const [tutorialProgress, setTutorialProgress] = useState(0);
   const [tutorialCompleted, setTutorialCompleted] = useState(false);
+  const tutorialCompletedRef = useRef(false);
+  const [voiceStatus, setVoiceStatus] = useState<string>("");
 
   // Timers & Dynamic Inputs
   const [welcomeCountdown, setWelcomeCountdown] = useState(5);
@@ -339,13 +345,16 @@ export default function BoothPage() {
     return canvas.toDataURL("image/jpeg", 0.92);
   }, []);
 
-  // ===== SPEECH RECOGNITION =====
+  // ===== SPEECH RECOGNITION (EMAIL SOUND RECOGNIZER) =====
   const startRecordingVoice = useCallback(() => {
     if (typeof window === "undefined" || isRecordingVoiceRef.current) return;
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-    if (!SpeechRecognition) return;
+    if (!SpeechRecognition) {
+      setVoiceStatus("Browser tidak mendukung input suara.");
+      return;
+    }
 
     try {
       const recognition = new SpeechRecognition();
@@ -353,16 +362,60 @@ export default function BoothPage() {
       recognition.continuous = false;
       recognition.interimResults = false;
 
+      recognition.onstart = () => {
+        setIsRecordingVoice(true);
+        isRecordingVoiceRef.current = true;
+        setVoiceStatus("Mendengarkan... Ucapkan email Anda");
+      };
+
       recognition.onresult = (event: any) => {
+        if (!event.results || !event.results[0] || !event.results[0][0]) return;
         const rawTranscript = event.results[0][0].transcript.toLowerCase();
+
+        // Convert spoken Indonesian numbers & separators into clean email format
         let formatted = rawTranscript
-          .replace(/\s+at\s+/g, "@")
-          .replace(/\s+et\s+/g, "@")
+          .replace(/\bnol\b/g, "0")
+          .replace(/\bkosong\b/g, "0")
+          .replace(/\bsatu\b/g, "1")
+          .replace(/\bdua\b/g, "2")
+          .replace(/\btiga\b/g, "3")
+          .replace(/\bempat\b/g, "4")
+          .replace(/\blima\b/g, "5")
+          .replace(/\benam\b/g, "6")
+          .replace(/\btujuh\b/g, "7")
+          .replace(/\bdelapan\b/g, "8")
+          .replace(/\bsembilan\b/g, "9")
+          .replace(/\s+(at|et|ad|add|a keong|keong|et keong|arroba)\s+/g, "@")
+          .replace(/(at|et|ad|add|a keong|keong|et keong)\s*gmail/g, "@gmail")
+          .replace(/(at|et|ad|add|a keong|keong|et keong)\s*yahoo/g, "@yahoo")
+          .replace(/\s+(dot|titik)\s+/g, ".")
           .replace(/\s+dot\s+/g, ".")
           .replace(/\s+titik\s+/g, ".")
-          .replace(/\s+/g, "");
+          .replace(/gmail\s+com/g, "gmail.com")
+          .replace(/yahoo\s+com/g, "yahoo.com")
+          .replace(/\s+/g, "")
+          .trim();
 
-        setEmailInput((prev) => (prev ? `${prev}${formatted}` : formatted));
+        if (formatted) {
+          setEmailInput((prev) => {
+            if (!prev) return formatted;
+            return `${prev}${formatted}`;
+          });
+          setVoiceStatus(`Terdengar: "${formatted}"`);
+        }
+      };
+
+      recognition.onerror = (e: any) => {
+        console.warn("Speech recognition error:", e.error);
+        if (e.error === "not-allowed") {
+          setVoiceStatus("Izin mikrofon ditolak.");
+        } else if (e.error === "no-speech") {
+          setVoiceStatus("Suara tidak terdengar. Silakan coba lagi.");
+        } else {
+          setVoiceStatus("Gagal mendengar suara. Silakan coba lagi.");
+        }
+        setIsRecordingVoice(false);
+        isRecordingVoiceRef.current = false;
       };
 
       recognition.onend = () => {
@@ -372,9 +425,9 @@ export default function BoothPage() {
 
       speechRecognitionRef.current = recognition;
       recognition.start();
-      setIsRecordingVoice(true);
-      isRecordingVoiceRef.current = true;
-    } catch {
+    } catch (err) {
+      console.warn("Speech recognition start failed:", err);
+      setVoiceStatus("Gagal mengaktifkan mikrofon.");
       setIsRecordingVoice(false);
       isRecordingVoiceRef.current = false;
     }
@@ -595,17 +648,35 @@ export default function BoothPage() {
 
         const canTriggerAction = Date.now() - stepEntryTimeRef.current > 1000;
 
-        if (result.gesture === "none") {
+        if (result.gesture === "none" || !hasHand) {
           lastProcessedGestureRef.current = "none";
+          gestureMustResetRef.current = false;
         }
 
         const isNewGesture =
           result.gesture !== "none" && result.gesture !== lastProcessedGestureRef.current;
         const canTriggerNewGestureAction = canTriggerAction && isNewGesture;
 
-        // POSE READY STEP: Peace Gesture ✌️ Trigger Photo Countdown
-        if (stepRef.current === "pose_ready" && result.gesture === "peace" && canTriggerNewGestureAction) {
+        // GESTURE TUTORIAL STEP: Must pose Peace ✌️ after 100% to proceed!
+        if (
+          stepRef.current === "gesture_tutorial" &&
+          tutorialCompletedRef.current &&
+          result.gesture === "peace" &&
+          canTriggerNewGestureAction
+        ) {
           lastProcessedGestureRef.current = result.gesture;
+          callbacksRef.current.setStep?.("select_package");
+        }
+
+        // POSE READY STEP: Peace Gesture ✌️ Trigger Photo Countdown (Requires Hand Reset)
+        if (
+          stepRef.current === "pose_ready" &&
+          !gestureMustResetRef.current &&
+          result.gesture === "peace" &&
+          canTriggerNewGestureAction
+        ) {
+          lastProcessedGestureRef.current = result.gesture;
+          gestureMustResetRef.current = true;
           callbacksRef.current.setStep?.("countdown");
         }
 
@@ -613,9 +684,11 @@ export default function BoothPage() {
         if (stepRef.current === "photo_review_single" && canTriggerNewGestureAction) {
           if (result.gesture === "peace" || result.gesture === "thumbs_up") {
             lastProcessedGestureRef.current = result.gesture;
+            gestureMustResetRef.current = true;
             callbacksRef.current.handleAcceptAndNextPose?.();
           } else if (result.gesture === "thumbs_down" || result.gesture === "wave") {
             lastProcessedGestureRef.current = result.gesture;
+            gestureMustResetRef.current = true;
             callbacksRef.current.handleRetakeCurrentPose?.();
           }
         }
@@ -738,18 +811,19 @@ export default function BoothPage() {
         if (progress >= 100) {
           clearInterval(interval);
           setTutorialCompleted(true);
-          setTimeout(() => {
-            setStep("select_package");
-          }, 800);
+          tutorialCompletedRef.current = true;
+          // Hand gesture is ready. Do NOT auto-advance; user MUST pose Peace ✌️ to proceed!
         }
       } else {
-        progress = Math.max(0, progress - 8);
-        setTutorialProgress(progress);
+        if (!tutorialCompletedRef.current) {
+          progress = Math.max(0, progress - 8);
+          setTutorialProgress(progress);
+        }
       }
     }, 50);
 
     return () => clearInterval(interval);
-  }, [step, setStep]);
+  }, [step]);
 
   // ===== ZERO-RE-RENDER UNIVERSAL DWELL HOVER CLICK WITH 1.8s DELIBERATE LOCK =====
   useEffect(() => {
@@ -928,7 +1002,9 @@ export default function BoothPage() {
       isTransitioningRef.current = false;
       if (!ENABLE_PAYMENT) {
         setCapturedPhotos([]);
+        currentPoseIndexRef.current = 0;
         setCurrentPoseIndex(0);
+        gestureMustResetRef.current = false;
         setStep("pose_ready");
       } else {
         setStep("payment_qris");
@@ -945,7 +1021,9 @@ export default function BoothPage() {
           if (prev <= 1) {
             clearInterval(interval);
             setCapturedPhotos([]);
+            currentPoseIndexRef.current = 0;
             setCurrentPoseIndex(0);
+            gestureMustResetRef.current = false;
             setStep("pose_ready");
             return 0;
           }
@@ -987,11 +1065,12 @@ export default function BoothPage() {
         setXenonFlash(true);
         setTimeout(() => setXenonFlash(false), 300);
 
-        // Capture snapshot
+        // Capture snapshot into target slot synchronously
         const snapshot = captureSnapshot();
         if (snapshot) {
+          const targetSlot = currentPoseIndexRef.current;
           const next = [...capturedPhotosRef.current];
-          next[currentPoseIndex] = snapshot;
+          next[targetSlot] = snapshot;
           capturedPhotosRef.current = next;
           setCapturedPhotos(next);
         }
@@ -1009,23 +1088,36 @@ export default function BoothPage() {
       cancelled = true;
       if (timer) clearInterval(timer);
     };
-  }, [step, currentPoseIndex, captureSnapshot, setStep]);
+  }, [step, captureSnapshot, setStep]);
 
   // Handler: Foto ulang pose slot ini saja (tidak menghapus pose sebelumnya)
   const handleRetakeCurrentPose = useCallback(() => {
+    const targetSlot = currentPoseIndexRef.current;
     const next = [...capturedPhotosRef.current];
-    next[currentPoseIndex] = "";
+    next[targetSlot] = "";
     capturedPhotosRef.current = next;
     setCapturedPhotos(next);
+    gestureMustResetRef.current = true;
+    lastProcessedGestureRef.current = "none";
     // Kembali ke pose_ready untuk pose ini (TIDAK OTOMATIS HITUNG, menunggu gestur Peace atau klik tombol)
     setStep("pose_ready");
-  }, [currentPoseIndex, setStep]);
+  }, [setStep]);
 
   // Handler: Terima foto ini dan lanjut ke pose berikutnya / review strip final
   const handleAcceptAndNextPose = useCallback(() => {
-    const nextPoseIdx = currentPoseIndex + 1;
+    if (isProcessingPoseAdvanceRef.current) return;
+    isProcessingPoseAdvanceRef.current = true;
+    setTimeout(() => {
+      isProcessingPoseAdvanceRef.current = false;
+    }, 1000);
+
+    const currentIdx = currentPoseIndexRef.current;
+    const nextPoseIdx = currentIdx + 1;
     if (nextPoseIdx < totalPoses) {
+      currentPoseIndexRef.current = nextPoseIdx;
       setCurrentPoseIndex(nextPoseIdx);
+      gestureMustResetRef.current = true;
+      lastProcessedGestureRef.current = "peace";
       // Pindah ke pose_ready foto berikutnya (Harus pose Peace lagi, TIDAK otomatis detik!)
       setStep("pose_ready");
     } else {
@@ -1041,7 +1133,7 @@ export default function BoothPage() {
         setStep("preview_retake");
       });
     }
-  }, [currentPoseIndex, totalPoses, selectedTheme, setStep]);
+  }, [totalPoses, selectedTheme, setStep]);
 
   // ===== PROCESSING (CANVAS COMPOSITING 300 DPI) =====
   useEffect(() => {
@@ -1114,6 +1206,7 @@ export default function BoothPage() {
     setCapturedPhotos([]);
     capturedPhotosRef.current = [];
     setPreviewStripUrl("");
+    currentPoseIndexRef.current = 0;
     setCurrentPoseIndex(0);
     setIsIntermission(false);
     setEmailInput("");
@@ -1123,6 +1216,9 @@ export default function BoothPage() {
     setIsPrinting(false);
     setTutorialProgress(0);
     setTutorialCompleted(false);
+    tutorialCompletedRef.current = false;
+    gestureMustResetRef.current = false;
+    isProcessingPoseAdvanceRef.current = false;
     photostripBase64Ref.current = "";
     lastProcessedGestureRef.current = "none";
     setStep("welcome_intro");
@@ -1140,7 +1236,10 @@ export default function BoothPage() {
     setCapturedPhotos([]);
     capturedPhotosRef.current = [];
     setPreviewStripUrl("");
+    currentPoseIndexRef.current = 0;
     setCurrentPoseIndex(0);
+    gestureMustResetRef.current = false;
+    isProcessingPoseAdvanceRef.current = false;
     setIsIntermission(false);
     setStep("pose_ready");
   };
@@ -1265,9 +1364,9 @@ export default function BoothPage() {
       <SlotGuideSilhouette
         slot={
           selectedTheme?.slots?.[
-            selectedTheme?.slotMapping
-              ? selectedTheme.slotMapping[currentPoseIndex] ?? currentPoseIndex
-              : currentPoseIndex % (selectedTheme?.slots?.length || 1)
+          selectedTheme?.slotMapping
+            ? selectedTheme.slotMapping[currentPoseIndex] ?? currentPoseIndex
+            : currentPoseIndex % (selectedTheme?.slots?.length || 1)
           ] || selectedTheme?.slots?.[0]
         }
         poseNumber={currentPoseIndex + 1}
@@ -1275,22 +1374,49 @@ export default function BoothPage() {
         active={step === "pose_ready" || step === "countdown"}
       />
 
-      {/* ===== LIVE FRAME PREVIEW DI POJOK KANAN (ALUR POLA Z) ===== */}
+      {/* ===== LIVE FRAME PREVIEW DI POJOK KANAN (DENGAN OPSI BUKA / TUTUP) ===== */}
       {(step === "pose_ready" || step === "countdown" || step === "photo_review_single") && (
-        <motion.div
-          initial={{ opacity: 0, x: 25 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: 25 }}
-          transition={{ duration: 0.3 }}
-          className="fixed right-6 top-1/2 -translate-y-1/2 z-30 hidden lg:flex flex-col items-center pointer-events-none"
-        >
-          <LiveFramePreview
-            frame={selectedTheme || FRAMES[0]}
-            capturedPhotos={capturedPhotos}
-            currentPoseIndex={currentPoseIndex}
-            totalPoses={totalPoses}
-          />
-        </motion.div>
+        <div className="fixed right-4 top-1/2 -translate-y-1/2 z-30 hidden lg:flex flex-col items-end pointer-events-auto">
+          {/* Toggle Button: Buka / Tutup Preview */}
+          <button
+            data-dwell-id="btn-toggle-frame-preview"
+            onClick={() => setIsFramePreviewOpen((prev) => !prev)}
+            className="mb-2 px-3.5 py-1.5 rounded-full bg-[#10111c]/90 hover:bg-[#1c1f30] border border-[#292b3b] hover:border-[#f0a25c] text-white text-xs font-mono-tech flex items-center gap-1.5 shadow-xl transition-all cursor-pointer"
+            title={isFramePreviewOpen ? "Tutup Preview" : "Buka Preview"}
+          >
+            {isFramePreviewOpen ? (
+              <>
+                <span className="text-[11px] text-[#ced0dc]">Sembunyikan Frame</span>
+                <ChevronRight className="w-3.5 h-3.5 text-[#f0a25c]" />
+              </>
+            ) : (
+              <>
+                <ChevronLeft className="w-3.5 h-3.5 text-[#f0a25c]" />
+                <span className="text-[11px] text-[#f0a25c] font-bold">Lihat Frame 🖼️</span>
+              </>
+            )}
+          </button>
+
+          {/* Animated Preview Container */}
+          <AnimatePresence>
+            {isFramePreviewOpen && (
+              <motion.div
+                initial={{ opacity: 0, x: 30, scale: 0.95 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: 30, scale: 0.95 }}
+                transition={{ duration: 0.25 }}
+                className="pointer-events-none"
+              >
+                <LiveFramePreview
+                  frame={selectedTheme || FRAMES[0]}
+                  capturedPhotos={capturedPhotos}
+                  currentPoseIndex={currentPoseIndex}
+                  totalPoses={totalPoses}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       )}
 
       {/* ===== RETICLE SENSOR CURSOR (DIRECTLY ATTACHED TO TELUNJUK) ===== */}
@@ -1460,66 +1586,25 @@ export default function BoothPage() {
             {/* Title & Instructions (To the point) */}
             <div className="max-w-xl mt-1 text-center">
               <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight mb-2">
-                Arahkan Telunjuk Anda 👆
+                Arahkan Telunjuk 👆
               </h2>
               <p className="text-[#ced0dc] text-sm sm:text-base">
-                Ujung jari telunjuk Anda adalah kursor layar. Coba gerakkan ke lingkaran di bawah.
+                Ujung jari telunjuk adalah kursor. Arahkan ke lingkaran di tengah layar.
               </p>
             </div>
 
-            {/* 3 Clean Steps */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-2xl my-2">
-              <div className={`p-3 rounded-2xl border transition-all text-left flex items-center gap-3 ${
-                isHandDetected ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-400" : "bg-[#10111c]/80 border-[#292b3b] text-[#9b9eaf]"
-              }`}>
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
-                  isHandDetected ? "bg-emerald-500 text-white" : "bg-[#171927] text-[#9b9eaf]"
-                }`}>
-                  1
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-white">Angkat Tangan</div>
-                  <div className="text-[11px] text-[#9b9eaf]">{isHandDetected ? "✓ Terdeteksi" : "Hadapkan ke kamera"}</div>
-                </div>
-              </div>
-
-              <div className={`p-3 rounded-2xl border transition-all text-left flex items-center gap-3 ${
-                tutorialProgress > 0 ? "bg-[#ff7b00]/10 border-[#ff7b00]/40 text-[#f0a25c]" : "bg-[#10111c]/80 border-[#292b3b] text-[#9b9eaf]"
-              }`}>
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
-                  tutorialProgress > 0 ? "bg-[#ff7b00] text-[#090a12]" : "bg-[#171927] text-[#9b9eaf]"
-                }`}>
-                  2
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-white">Telunjuk 👆</div>
-                  <div className="text-[11px] text-[#9b9eaf]">{tutorialProgress > 0 ? `${tutorialProgress}% Terkunci` : "Kursor layar"}</div>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-2xl border border-[#292b3b] bg-[#10111c]/80 text-left flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-[#171927] text-[#f0a25c] flex items-center justify-center font-bold text-xs">
-                  3
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-white">Pose Peace ✌️</div>
-                  <div className="text-[11px] text-[#9b9eaf]">Untuk foto nanti</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Central Target Sensor Portal (Lifted high for camera ergonomics) */}
-            <div className="relative my-2 flex flex-col items-center justify-center">
+            {/* Central Target Sensor Portal (Vertically & Horizontally Centered) */}
+            <div className="relative my-auto flex flex-col items-center justify-center">
               <motion.div
                 ref={targetCircleRef}
                 animate={
                   tutorialCompleted
-                    ? { scale: [1, 1.12, 1] }
+                    ? { scale: [1, 1.08, 1] }
                     : { scale: [1, 1.04, 1] }
                 }
                 transition={{ duration: 1.5, repeat: Infinity }}
-                className={`relative w-40 h-40 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${tutorialCompleted
-                  ? "bg-emerald-500/20 border-emerald-400 shadow-[0_0_40px_rgba(52,211,153,0.5)]"
+                className={`relative w-44 h-44 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${tutorialCompleted
+                  ? "bg-emerald-500/20 border-emerald-400 shadow-[0_0_45px_rgba(52,211,153,0.55)]"
                   : tutorialProgress > 0
                     ? "bg-[#f0a25c]/15 border-[#f0a25c] shadow-[0_0_35px_rgba(240,162,92,0.4)]"
                     : "bg-[#10111c]/85 border-[#292b3b] shadow-2xl"
@@ -1528,21 +1613,21 @@ export default function BoothPage() {
                 {/* Radial Progress Gauge */}
                 <svg className="absolute inset-0 w-full h-full transform -rotate-90 pointer-events-none">
                   <circle
-                    cx="80"
-                    cy="80"
-                    r="72"
+                    cx="88"
+                    cy="88"
+                    r="80"
                     stroke="rgba(255, 255, 255, 0.08)"
                     strokeWidth="4"
                     fill="none"
                   />
                   <circle
-                    cx="80"
-                    cy="80"
-                    r="72"
+                    cx="88"
+                    cy="88"
+                    r="80"
                     stroke={tutorialCompleted ? "#34d399" : "#f0a25c"}
                     strokeWidth="5"
-                    strokeDasharray="452"
-                    strokeDashoffset={452 - (452 * tutorialProgress) / 100}
+                    strokeDasharray="502"
+                    strokeDashoffset={502 - (502 * tutorialProgress) / 100}
                     strokeLinecap="round"
                     fill="none"
                     className="transition-all duration-100"
@@ -1557,14 +1642,14 @@ export default function BoothPage() {
                       animate={{ scale: 1 }}
                       className="text-emerald-400 flex flex-col items-center justify-center"
                     >
-                      <CheckCircle2 className="w-10 h-10 mb-1" />
-                      <span className="font-bold text-xs text-white uppercase tracking-wider">
+                      <CheckCircle2 className="w-12 h-12 mb-1" />
+                      <span className="font-extrabold text-sm text-white uppercase tracking-wider">
                         Sensor Siap!
                       </span>
                     </motion.div>
                   ) : (
                     <div className="flex flex-col items-center justify-center">
-                      <span className="text-3xl mb-1 animate-bounce">👆</span>
+                      <span className="text-4xl mb-1 animate-bounce">👆</span>
                       <span className="text-xs font-bold text-white uppercase tracking-wider">
                         {tutorialProgress > 0 ? `${tutorialProgress}%` : "Arahkan Telunjuk"}
                       </span>
@@ -1574,13 +1659,98 @@ export default function BoothPage() {
                 </div>
               </motion.div>
 
-              <span className="font-mono-tech text-xs text-[#ced0dc] mt-3">
-                Kursor menempel tepat di ujung jari telunjuk Anda 👆
-              </span>
+              {/* Requirement: User MUST pose Peace to proceed when completed */}
+              {tutorialCompleted ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-4 flex flex-col items-center gap-2"
+                >
+                  <motion.div
+                    animate={{ scale: [1, 1.05, 1] }}
+                    transition={{ repeat: Infinity, duration: 1.2 }}
+                    className="px-6 py-2.5 rounded-2xl bg-[#f0a25c] text-[#090a12] font-black text-sm uppercase tracking-wider shadow-[0_0_25px_rgba(240,162,92,0.6)] flex items-center gap-2 select-none"
+                  >
+                    <PeaceIcon className="w-5 h-5 text-[#090a12]" />
+                    <span>Pose Peace ✌️ Untuk Lanjut</span>
+                  </motion.div>
+                  <button
+                    data-dwell-id="btn-tutorial-continue"
+                    onClick={() => setStep("select_package")}
+                    className="text-xs text-[#9b9eaf] hover:text-white underline cursor-pointer mt-1"
+                  >
+                    atau klik / arahkan telunjuk ke sini untuk lanjut
+                  </button>
+                </motion.div>
+              ) : (
+                <span className="font-mono-tech text-xs text-[#ced0dc] mt-3">
+                  Kursor menempel tepat di ujung jari telunjuk Anda 👆
+                </span>
+              )}
             </div>
 
-            {/* Bottom spacer */}
-            <div className="h-2" />
+            {/* 3 Informational Steps at the Bottom (Non-interactive Guide Cards) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-2xl mb-2 sm:mb-4">
+              <div
+                className={`p-3 rounded-2xl border transition-all text-left flex items-center gap-3 ${isHandDetected
+                  ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-400"
+                  : "bg-[#10111c]/80 border-[#292b3b] text-[#9b9eaf]"
+                  }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${isHandDetected ? "bg-emerald-500 text-white" : "bg-[#171927] text-[#9b9eaf]"
+                    }`}
+                >
+                  1
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white">Angkat Tangan</div>
+                  <div className="text-[11px] text-[#9b9eaf]">
+                    {isHandDetected ? "✓ Terdeteksi" : "Hadapkan ke kamera"}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className={`p-3 rounded-2xl border transition-all text-left flex items-center gap-3 ${tutorialProgress > 0
+                  ? "bg-[#ff7b00]/10 border-[#ff7b00]/40 text-[#f0a25c]"
+                  : "bg-[#10111c]/80 border-[#292b3b] text-[#9b9eaf]"
+                  }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${tutorialProgress > 0 ? "bg-[#ff7b00] text-[#090a12]" : "bg-[#171927] text-[#9b9eaf]"
+                    }`}
+                >
+                  2
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white">Telunjuk 👆</div>
+                  <div className="text-[11px] text-[#9b9eaf]">
+                    {tutorialProgress > 0 ? `${tutorialProgress}% Terkunci` : "Kursor layar"}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className={`p-3 rounded-2xl border transition-all text-left flex items-center gap-3 ${tutorialCompleted
+                  ? "bg-[#f0a25c]/15 border-[#f0a25c]/50 text-[#f0a25c]"
+                  : "bg-[#10111c]/80 border-[#292b3b] text-[#9b9eaf]"
+                  }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${tutorialCompleted ? "bg-[#f0a25c] text-[#090a12]" : "bg-[#171927] text-[#f0a25c]"
+                    }`}
+                >
+                  3
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white">Pose Peace ✌️</div>
+                  <div className="text-[11px] text-[#9b9eaf]">
+                    {tutorialCompleted ? "Tunjukkan sekarang!" : "Untuk konfirmasi"}
+                  </div>
+                </div>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1597,28 +1767,27 @@ export default function BoothPage() {
             exit={{ opacity: 0, scale: 0.96 }}
             className="absolute inset-0 z-30 bg-[#090a12]/80 backdrop-blur-md flex flex-col items-center justify-between p-6 sm:p-10 text-center"
           >
-            {/* Top Navigation Bar with Back Button (Ergonomic, High in Camera View) */}
-            <div className="w-full max-w-5xl flex items-center justify-between mb-2 pt-2">
-              <button
-                data-dwell-id="btn-back-tutorial"
-                onClick={() => setStep("gesture_tutorial")}
-                className="px-5 py-2.5 rounded-xl bg-[#171927]/90 hover:bg-[#202336] text-[#ced0dc] hover:text-white border border-[#292b3b] font-medium text-sm flex items-center gap-2 shadow-lg transition-all"
-              >
-                <ArrowLeft className="w-4 h-4 text-[#f0a25c]" />
-                <span>Kembali</span>
-              </button>
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#ff7b00]/10 border border-[#ff7b00]/25 text-[#f0a25c] font-mono-tech text-xs tracking-wider uppercase font-semibold">
+            {/* Top Center Header with Back Button (Ergonomic, Direct Center Below Title) */}
+            <div className="flex flex-col items-center text-center mt-1 mb-3">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#ff7b00]/10 border border-[#ff7b00]/25 text-[#f0a25c] font-mono-tech text-xs tracking-wider uppercase font-semibold mb-2">
                 <span>Langkah 1 Dari 3</span>
               </div>
-            </div>
-
-            <div className="mb-4">
               <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
                 Pilih Paket Foto Studio
               </h2>
               <p className="text-[#ced0dc] text-sm sm:text-base mt-1.5">
                 Arahkan telunjuk ke paket pilihan
               </p>
+
+              {/* Ergonomic Top-Center Back Button */}
+              <button
+                data-dwell-id="btn-back-tutorial"
+                onClick={() => setStep("gesture_tutorial")}
+                className="mt-3 px-6 py-2.5 rounded-xl bg-[#171927]/90 hover:bg-[#202336] text-[#ced0dc] hover:text-white border border-[#292b3b] font-medium text-xs sm:text-sm inline-flex items-center gap-2 shadow-lg transition-all cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4 text-[#f0a25c]" />
+                <span>Kembali ke Latihan Sensor</span>
+              </button>
             </div>
 
             {/* 3 Package Cards */}
@@ -1722,28 +1891,27 @@ export default function BoothPage() {
             exit={{ opacity: 0, scale: 0.96 }}
             className="absolute inset-0 z-30 bg-[#090a12]/80 backdrop-blur-md flex flex-col items-center justify-between p-6 sm:p-10 text-center"
           >
-            {/* Top Navigation Bar with Back Button */}
-            <div className="w-full max-w-4xl flex items-center justify-between mb-2 pt-2">
-              <button
-                data-dwell-id="btn-back-package"
-                onClick={() => setStep("select_package")}
-                className="px-5 py-2.5 rounded-xl bg-[#171927]/90 hover:bg-[#202336] text-[#ced0dc] hover:text-white border border-[#292b3b] font-medium text-sm flex items-center gap-2 shadow-lg transition-all"
-              >
-                <ArrowLeft className="w-4 h-4 text-[#f0a25c]" />
-                <span>Kembali</span>
-              </button>
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#246cff]/10 border border-[#246cff]/25 text-[#246cff] font-mono-tech text-xs tracking-wider uppercase font-semibold">
+            {/* Top Center Header with Back Button (Ergonomic, Direct Center Below Title) */}
+            <div className="flex flex-col items-center text-center mt-1 mb-3">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#246cff]/10 border border-[#246cff]/25 text-[#246cff] font-mono-tech text-xs tracking-wider uppercase font-semibold mb-2">
                 <span>Langkah 2 Dari 3</span>
               </div>
-            </div>
-
-            <div className="mb-4">
               <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
                 Pilih Ukuran / Format Foto
               </h2>
               <p className="text-[#ced0dc] text-sm sm:text-base mt-1.5">
                 Arahkan telunjuk ke ukuran cetak pilihan
               </p>
+
+              {/* Ergonomic Top-Center Back Button */}
+              <button
+                data-dwell-id="btn-back-package"
+                onClick={() => setStep("select_package")}
+                className="mt-3 px-6 py-2.5 rounded-xl bg-[#171927]/90 hover:bg-[#202336] text-[#ced0dc] hover:text-white border border-[#292b3b] font-medium text-xs sm:text-sm inline-flex items-center gap-2 shadow-lg transition-all cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4 text-[#f0a25c]" />
+                <span>Kembali ke Pilih Paket</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl w-full my-auto">
@@ -1842,28 +2010,27 @@ export default function BoothPage() {
             exit={{ opacity: 0, scale: 0.96 }}
             className="absolute inset-0 z-30 bg-[#090a12]/80 backdrop-blur-md flex flex-col items-center justify-between p-6 sm:p-10 text-center"
           >
-            {/* Top Navigation Bar with Back Button */}
-            <div className="w-full max-w-5xl flex items-center justify-between mb-2 pt-2">
-              <button
-                data-dwell-id="btn-back-format"
-                onClick={() => setStep("select_format")}
-                className="px-5 py-2.5 rounded-xl bg-[#171927]/90 hover:bg-[#202336] text-[#ced0dc] hover:text-white border border-[#292b3b] font-medium text-sm flex items-center gap-2 shadow-lg transition-all"
-              >
-                <ArrowLeft className="w-4 h-4 text-[#f0a25c]" />
-                <span>Kembali</span>
-              </button>
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#ff7b00]/10 border border-[#ff7b00]/25 text-[#f0a25c] font-mono-tech text-xs tracking-wider uppercase font-semibold">
+            {/* Top Center Header with Back Button (Ergonomic, Direct Center Below Title) */}
+            <div className="flex flex-col items-center text-center mt-1 mb-3">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#ff7b00]/10 border border-[#ff7b00]/25 text-[#f0a25c] font-mono-tech text-xs tracking-wider uppercase font-semibold mb-2">
                 <span>Langkah 3 Dari 3</span>
               </div>
-            </div>
-
-            <div className="mb-3">
               <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
                 Pilih Bingkai Foto ({selectedFormat?.name || "Semua"})
               </h2>
               <p className="text-[#ced0dc] text-sm sm:text-base mt-1.5">
                 Arahkan telunjuk ke desain bingkai favorit Anda
               </p>
+
+              {/* Ergonomic Top-Center Back Button */}
+              <button
+                data-dwell-id="btn-back-format"
+                onClick={() => setStep("select_format")}
+                className="mt-3 px-6 py-2.5 rounded-xl bg-[#171927]/90 hover:bg-[#202336] text-[#ced0dc] hover:text-white border border-[#292b3b] font-medium text-xs sm:text-sm inline-flex items-center gap-2 shadow-lg transition-all cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4 text-[#f0a25c]" />
+                <span>Kembali ke Pilih Format</span>
+              </button>
             </div>
 
             {/* Template Cards Grid filtered by selectedFormat */}
@@ -2012,18 +2179,18 @@ export default function BoothPage() {
             exit={{ opacity: 0, scale: 0.94 }}
             className="absolute inset-0 z-40 bg-[#090a12]/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center"
           >
-            <div className="w-full max-w-md flex items-center justify-between mb-4">
+            <div className="w-full max-w-md flex flex-col items-center justify-center mb-3">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#246cff]/10 border border-[#246cff]/25 text-[#246cff] font-mono-tech text-xs tracking-wider uppercase font-semibold mb-2">
+                <span>Konfirmasi Pembayaran</span>
+              </div>
               <button
                 data-dwell-id="btn-back-theme"
                 onClick={() => setStep("select_theme")}
-                className="px-5 py-2.5 rounded-xl bg-[#171927]/90 hover:bg-[#202336] text-[#ced0dc] hover:text-white border border-[#292b3b] font-medium text-sm flex items-center gap-2 shadow-lg transition-all"
+                className="px-6 py-2 rounded-xl bg-[#171927]/90 hover:bg-[#202336] text-[#ced0dc] hover:text-white border border-[#292b3b] font-medium text-xs sm:text-sm inline-flex items-center gap-2 shadow-lg transition-all cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4 text-[#f0a25c]" />
-                <span>Kembali</span>
+                <span>Kembali ke Pilih Bingkai</span>
               </button>
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#246cff]/10 border border-[#246cff]/25 text-[#246cff] font-mono-tech text-xs tracking-wider uppercase font-semibold">
-                <span>Konfirmasi Pembayaran</span>
-              </div>
             </div>
 
             <div className="bg-[#10111c]/95 backdrop-blur-lg rounded-3xl p-7 sm:p-8 max-w-md w-full text-center border border-[#292b3b] shadow-2xl">
@@ -2103,14 +2270,6 @@ export default function BoothPage() {
 
             {/* Center Call-to-Action Card */}
             <div className="max-w-md bg-[#10111c]/90 backdrop-blur-md p-6 sm:p-8 rounded-3xl border border-[#292b3b] shadow-2xl">
-              <div className="w-16 h-16 rounded-2xl bg-[#f0a25c]/15 text-[#f0a25c] border border-[#f0a25c]/30 flex items-center justify-center mx-auto mb-3 shadow-lg">
-                <PeaceIcon className="w-9 h-9 animate-bounce" />
-              </div>
-
-              <div className="inline-block px-3 py-1 rounded-full bg-[#ff7b00]/15 border border-[#ff7b00]/30 text-[#f0a25c] text-[11px] font-mono-tech uppercase font-bold tracking-wider mb-2">
-                Tidak Otomatis • Kendali Penuh
-              </div>
-
               <h2 className="text-3xl sm:text-4xl font-black text-white mb-2 tracking-tight">
                 Pose Ke-{currentPoseIndex + 1}
               </h2>
@@ -2129,9 +2288,8 @@ export default function BoothPage() {
               </button>
             </div>
 
-            <div className="mb-4 text-xs font-mono-tech text-[#ced0dc] bg-[#10111c]/80 px-4 py-2 rounded-xl border border-[#292b3b]">
-              Foto ini akan mengisi slot #{currentPoseIndex + 1} pada bingkai di sisi kanan layar
-            </div>
+            {/* Spacer */}
+            <div className="h-4" />
           </motion.div>
         )}
       </AnimatePresence>
@@ -2207,12 +2365,9 @@ export default function BoothPage() {
                 </div>
               </button>
 
-              <div className="px-4 py-2 rounded-2xl bg-[#10111c]/90 border border-[#292b3b] text-center hidden sm:block">
+              <div className="px-5 py-2.5 rounded-2xl bg-[#10111c]/90 border border-[#292b3b] text-center hidden sm:block">
                 <span className="font-mono-tech text-xs sm:text-sm text-[#f0a25c] uppercase font-extrabold tracking-widest block">
-                  Foto {currentPoseIndex + 1} Dari {totalPoses} Selesai
-                </span>
-                <span className="text-[11px] text-[#ced0dc]">
-                  Tersimpan di slot bingkai sebelah kanan
+                  Foto {currentPoseIndex + 1} Dari {totalPoses}
                 </span>
               </div>
 
@@ -2478,18 +2633,19 @@ export default function BoothPage() {
                 Masukkan email Anda atau gunakan suara (Kepal tangan ✊ untuk bicara)
               </p>
 
-              <div className="relative mb-4">
+              <div className="relative mb-3">
                 <input
                   type="email"
                   value={emailInput}
                   onChange={(e) => setEmailInput(e.target.value)}
                   placeholder="contoh@gmail.com"
-                  className="w-full px-4 py-3 bg-[#090a12] border border-[#292b3b] rounded-xl text-white placeholder:text-[#454964] focus:outline-none focus:border-[#246cff] text-sm"
+                  className="w-full px-4 py-3 bg-[#090a12] border border-[#292b3b] rounded-xl text-white placeholder:text-[#454964] focus:outline-none focus:border-[#246cff] text-sm pr-12 font-mono-tech"
                 />
                 <button
                   type="button"
+                  data-dwell-id="btn-voice-email"
                   onClick={isRecordingVoice ? stopRecordingVoice : startRecordingVoice}
-                  className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-colors ${isRecordingVoice ? "bg-rose-500 text-white" : "text-[#9b9eaf] hover:text-white"
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-colors cursor-pointer ${isRecordingVoice ? "bg-rose-500 text-white animate-pulse" : "bg-[#171927] text-[#9b9eaf] hover:text-white hover:bg-[#246cff]"
                     }`}
                   title="Voice Input Email"
                 >
@@ -2497,11 +2653,45 @@ export default function BoothPage() {
                 </button>
               </div>
 
-              {isRecordingVoice && (
-                <p className="text-[11px] text-[#f0a25c] mb-3 animate-pulse">
-                  Mendengarkan... Ucapkan alamat email Anda dengan jelas
+              {/* Status Voice Recognizer */}
+              {isRecordingVoice ? (
+                <div className="p-2 mb-3 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs animate-pulse flex items-center justify-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                  <span>Mendengarkan... Ucapkan email (contoh: "budi123 at gmail dot com")</span>
+                </div>
+              ) : voiceStatus ? (
+                <p className="text-xs text-[#f0a25c] mb-3 font-mono-tech">
+                  {voiceStatus}
                 </p>
-              )}
+              ) : null}
+
+              {/* Quick Domain Tap / Dwell Pills */}
+              <div className="flex flex-wrap items-center justify-center gap-1.5 mb-4">
+                {["@gmail.com", "@yahoo.com", "@outlook.com"].map((dom) => (
+                  <button
+                    key={dom}
+                    type="button"
+                    data-dwell-id={`domain-${dom}`}
+                    onClick={() => {
+                      setEmailInput((prev) => {
+                        const base = prev.split("@")[0].trim();
+                        return base ? `${base}${dom}` : dom;
+                      });
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-[#171927] hover:bg-[#246cff] border border-[#292b3b] text-white text-[11px] font-mono-tech transition-colors cursor-pointer"
+                  >
+                    {dom}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  data-dwell-id="btn-clear-email"
+                  onClick={() => setEmailInput("")}
+                  className="px-2.5 py-1 rounded-lg bg-[#171927] hover:bg-rose-600/80 border border-[#292b3b] text-[#9b9eaf] hover:text-white text-[11px] font-mono-tech transition-colors cursor-pointer"
+                >
+                  ⌫ Hapus
+                </button>
+              </div>
 
               <div className="flex flex-row gap-3">
                 <button
