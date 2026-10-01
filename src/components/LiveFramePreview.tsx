@@ -30,30 +30,15 @@ export default function LiveFramePreview({
       className={`flex flex-col items-center select-none ${className}`}
     >
       {/* Header Info Tag with Close Button */}
-      <div className="mb-2 px-3 py-1.5 rounded-xl bg-[#10111c]/95 border border-[#292b3b] shadow-xl backdrop-blur-md flex items-center justify-between gap-2.5 w-full">
-        <div className="flex items-center gap-2">
-          <span className="font-mono-tech text-[11px] font-bold text-white tracking-wider uppercase">
-            Preview
-          </span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#246cff]/20 text-[#246cff] font-bold">
-            {capturedPhotos.filter(Boolean).length}/{totalPoses}
+      <div className="mb-2 px-3.5 py-2 rounded-2xl bg-[#10111c]/95 border border-[#292b3b] shadow-xl backdrop-blur-md flex items-center justify-between gap-3 w-full">
+        <div className="flex items-center gap-1.5">
+          <span className="font-mono-tech text-xs font-extrabold text-white tracking-wider uppercase">
+            Bingkai
           </span>
         </div>
-
-        {onClose && (
-          <button
-            type="button"
-            data-dwell-id="btn-close-frame-preview-header"
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            className="w-5 h-5 rounded-md bg-[#171927] hover:bg-rose-500/30 text-[#ced0dc] hover:text-rose-300 flex items-center justify-center transition-all cursor-pointer pointer-events-auto active:scale-90"
-            title="Tutup Preview"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        )}
+        <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#f0a25c]/15 border border-[#f0a25c]/40 text-[#f0a25c] font-bold font-mono-tech">
+          {capturedPhotos.filter(Boolean).length} dari {totalPoses}
+        </span>
       </div>
 
       {/* Frame Scaled Container */}

@@ -28,6 +28,7 @@ import {
   ChevronLeft,
   ShieldCheck,
   Target,
+  X,
 } from "lucide-react";
 import {
   FORMATS,
@@ -206,6 +207,8 @@ export default function BoothPage() {
   const gestureMustResetRef = useRef(false);
   const isProcessingPoseAdvanceRef = useRef(false);
   const [isFramePreviewOpen, setIsFramePreviewOpen] = useState(true);
+  const [selectedRetakePose, setSelectedRetakePose] = useState<number>(0);
+  const selectedRetakePoseRef = useRef<number>(0);
 
   // Gesture & Cursor Tracking State
   const [lastDetectedGesture, setLastDetectedGesture] = useState<GestureType>("none");
@@ -541,7 +544,7 @@ export default function BoothPage() {
         videoRef.current.srcObject = streamRef.current;
         try {
           await videoRef.current.play();
-        } catch (_) {}
+        } catch (_) { }
       }
       setCameraReady(true);
       setCameraStatus("ready");
@@ -632,173 +635,173 @@ export default function BoothPage() {
 
           // Set up MediaPipe Callback
           mp.onGesture((result: GestureResult) => {
-        const hasHand = Boolean(result.landmarks && result.landmarks.length >= 21);
-        if (hasHand !== isHandDetectedRef.current) {
-          isHandDetectedRef.current = hasHand;
-          setIsHandDetected(hasHand);
-        }
+            const hasHand = Boolean(result.landmarks && result.landmarks.length >= 21);
+            if (hasHand !== isHandDetectedRef.current) {
+              isHandDetectedRef.current = hasHand;
+              setIsHandDetected(hasHand);
+            }
 
-        if (result.gesture !== lastDetectedGestureRef.current) {
-          lastDetectedGestureRef.current = result.gesture;
-          setLastDetectedGesture(result.gesture);
-        }
+            if (result.gesture !== lastDetectedGestureRef.current) {
+              lastDetectedGestureRef.current = result.gesture;
+              setLastDetectedGesture(result.gesture);
+            }
 
-        // Smooth landmarks with Exponential Moving Average (EMA) to eliminate micro-jitter ("anti-wiggly")
-        let activeLandmarks = result.landmarks;
-        if (hasHand && result.landmarks) {
-          if (!smoothedLandmarksRef.current || smoothedLandmarksRef.current.length !== result.landmarks.length) {
-            smoothedLandmarksRef.current = result.landmarks.map((l) => ({ ...l }));
-          } else {
-            const alpha = 0.65; // High stability + zero perceived latency
-            smoothedLandmarksRef.current = result.landmarks.map((l, i) => {
-              const prev = smoothedLandmarksRef.current![i];
-              return {
-                x: prev.x * alpha + l.x * (1 - alpha),
-                y: prev.y * alpha + l.y * (1 - alpha),
-                z: (prev.z ?? 0) * alpha + (l.z ?? 0) * (1 - alpha),
+            // Smooth landmarks with Exponential Moving Average (EMA) to eliminate micro-jitter ("anti-wiggly")
+            let activeLandmarks = result.landmarks;
+            if (hasHand && result.landmarks) {
+              if (!smoothedLandmarksRef.current || smoothedLandmarksRef.current.length !== result.landmarks.length) {
+                smoothedLandmarksRef.current = result.landmarks.map((l) => ({ ...l }));
+              } else {
+                const alpha = 0.15; // 85% fresh landmark: zero perceptible latency, instant response
+                smoothedLandmarksRef.current = result.landmarks.map((l, i) => {
+                  const prev = smoothedLandmarksRef.current![i];
+                  return {
+                    x: prev.x * alpha + l.x * (1 - alpha),
+                    y: prev.y * alpha + l.y * (1 - alpha),
+                    z: (prev.z ?? 0) * alpha + (l.z ?? 0) * (1 - alpha),
+                  };
+                });
+              }
+              activeLandmarks = smoothedLandmarksRef.current;
+            } else {
+              smoothedLandmarksRef.current = null;
+            }
+
+            // Draw full hand skeleton on canvas using smoothed landmarks
+            if (canvasRef.current) {
+              const ctx = canvasRef.current.getContext("2d");
+              if (ctx) {
+                if (hasHand && activeLandmarks) {
+                  drawHandSkeleton(
+                    ctx,
+                    activeLandmarks,
+                    canvasRef.current.width,
+                    canvasRef.current.height
+                  );
+                } else {
+                  ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+                }
+              }
+            }
+
+            // Direct Index Finger Tip #8 Tracking - Cursor sits precisely on the user's telunjuk
+            if (hasHand && activeLandmarks && activeLandmarks[8]) {
+              const indexTip = activeLandmarks[8];
+              const exactX = (1 - indexTip.x) * 100;
+              const exactY = indexTip.y * 100;
+
+              targetCursorPosRef.current = {
+                x: exactX,
+                y: exactY,
               };
-            });
-          }
-          activeLandmarks = smoothedLandmarksRef.current;
-        } else {
-          smoothedLandmarksRef.current = null;
-        }
-
-        // Draw full hand skeleton on canvas using smoothed landmarks
-        if (canvasRef.current) {
-          const ctx = canvasRef.current.getContext("2d");
-          if (ctx) {
-            if (hasHand && activeLandmarks) {
-              drawHandSkeleton(
-                ctx,
-                activeLandmarks,
-                canvasRef.current.width,
-                canvasRef.current.height
-              );
             } else {
-              ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+              targetCursorPosRef.current = null;
             }
-          }
-        }
 
-        // Direct Index Finger Tip #8 Tracking - Cursor sits precisely on the user's telunjuk
-        if (hasHand && activeLandmarks && activeLandmarks[8]) {
-          const indexTip = activeLandmarks[8];
-          const exactX = (1 - indexTip.x) * 100;
-          const exactY = indexTip.y * 100;
+            const canTriggerAction = Date.now() - stepEntryTimeRef.current > 1000;
 
-          targetCursorPosRef.current = {
-            x: exactX,
-            y: exactY,
-          };
-        } else {
-          targetCursorPosRef.current = null;
-        }
+            if (result.gesture === "none" || !hasHand) {
+              lastProcessedGestureRef.current = "none";
+              gestureMustResetRef.current = false;
+            }
 
-        const canTriggerAction = Date.now() - stepEntryTimeRef.current > 1000;
+            const isNewGesture =
+              result.gesture !== "none" && result.gesture !== lastProcessedGestureRef.current;
+            const canTriggerNewGestureAction = canTriggerAction && isNewGesture;
 
-        if (result.gesture === "none" || !hasHand) {
-          lastProcessedGestureRef.current = "none";
-          gestureMustResetRef.current = false;
-        }
+            // GESTURE TUTORIAL STEP: Must pose Peace ✌️ after 100% to proceed!
+            if (
+              stepRef.current === "gesture_tutorial" &&
+              tutorialCompletedRef.current &&
+              result.gesture === "peace" &&
+              canTriggerNewGestureAction
+            ) {
+              lastProcessedGestureRef.current = result.gesture;
+              callbacksRef.current.setStep?.("select_package");
+            }
 
-        const isNewGesture =
-          result.gesture !== "none" && result.gesture !== lastProcessedGestureRef.current;
-        const canTriggerNewGestureAction = canTriggerAction && isNewGesture;
+            // POSE READY STEP: Peace Gesture ✌️ Trigger Photo Countdown (Requires Hand Reset)
+            if (
+              stepRef.current === "pose_ready" &&
+              !gestureMustResetRef.current &&
+              result.gesture === "peace" &&
+              canTriggerNewGestureAction
+            ) {
+              lastProcessedGestureRef.current = result.gesture;
+              gestureMustResetRef.current = true;
+              callbacksRef.current.setStep?.("countdown");
+            }
 
-        // GESTURE TUTORIAL STEP: Must pose Peace ✌️ after 100% to proceed!
-        if (
-          stepRef.current === "gesture_tutorial" &&
-          tutorialCompletedRef.current &&
-          result.gesture === "peace" &&
-          canTriggerNewGestureAction
-        ) {
-          lastProcessedGestureRef.current = result.gesture;
-          callbacksRef.current.setStep?.("select_package");
-        }
-
-        // POSE READY STEP: Peace Gesture ✌️ Trigger Photo Countdown (Requires Hand Reset)
-        if (
-          stepRef.current === "pose_ready" &&
-          !gestureMustResetRef.current &&
-          result.gesture === "peace" &&
-          canTriggerNewGestureAction
-        ) {
-          lastProcessedGestureRef.current = result.gesture;
-          gestureMustResetRef.current = true;
-          callbacksRef.current.setStep?.("countdown");
-        }
-
-        // PHOTO REVIEW SINGLE STEP: Deliberately HOLD Peace ✌️ / Thumbs Up 👍 (Lanjut) or Thumbs Down 👎 (Foto Ulang) for 1000ms
-        // Menampilkan skeleton tidak boleh otomatis pindah / error! Harus ditahan gesturnya secara sengaja.
-        if (stepRef.current === "photo_review_single") {
-          const isSettledAfterFlash = Date.now() - stepEntryTimeRef.current > 1200; // 1.2s cooldown setelah foto muncul
-          if (isSettledAfterFlash) {
-            if (result.gesture === "peace" || result.gesture === "thumbs_up") {
-              if (gestureHoldRef.current.gesture !== result.gesture) {
-                gestureHoldRef.current = { gesture: result.gesture, startTime: Date.now() };
-              } else if (Date.now() - gestureHoldRef.current.startTime >= 1000) {
+            // PHOTO REVIEW SINGLE STEP: Deliberately HOLD Peace ✌️ / Thumbs Up 👍 (Lanjut) or Thumbs Down 👎 (Foto Ulang) for 800ms
+            if (stepRef.current === "photo_review_single") {
+              const isSettledAfterFlash = Date.now() - stepEntryTimeRef.current > 500; // 500ms cooldown setelah jepret
+              if (isSettledAfterFlash) {
+                if (result.gesture === "peace" || result.gesture === "thumbs_up") {
+                  if (gestureHoldRef.current.gesture !== result.gesture) {
+                    gestureHoldRef.current = { gesture: result.gesture, startTime: Date.now() };
+                  } else if (Date.now() - gestureHoldRef.current.startTime >= 800) {
+                    gestureHoldRef.current = { gesture: "none", startTime: 0 };
+                    lastProcessedGestureRef.current = result.gesture;
+                    gestureMustResetRef.current = true;
+                    callbacksRef.current.handleAcceptAndNextPose?.();
+                  }
+                } else if (result.gesture === "thumbs_down") {
+                  if (gestureHoldRef.current.gesture !== "thumbs_down") {
+                    gestureHoldRef.current = { gesture: "thumbs_down", startTime: Date.now() };
+                  } else if (Date.now() - gestureHoldRef.current.startTime >= 800) {
+                    gestureHoldRef.current = { gesture: "none", startTime: 0 };
+                    lastProcessedGestureRef.current = "thumbs_down";
+                    gestureMustResetRef.current = true;
+                    callbacksRef.current.handleRetakeCurrentPose?.();
+                  }
+                } else {
+                  gestureHoldRef.current = { gesture: "none", startTime: 0 };
+                }
+              } else {
                 gestureHoldRef.current = { gesture: "none", startTime: 0 };
+              }
+            }
+
+            // PREVIEW / RETAKE STEP: Deliberately HOLD Thumbs Up 👍 (Continue) / Thumbs Down 👎 (Retake) for 800ms
+            if (stepRef.current === "preview_retake") {
+              const isSettled = Date.now() - stepEntryTimeRef.current > 600;
+              if (isSettled) {
+                if (result.gesture === "thumbs_up") {
+                  if (gestureHoldRef.current.gesture !== "thumbs_up") {
+                    gestureHoldRef.current = { gesture: "thumbs_up", startTime: Date.now() };
+                  } else if (Date.now() - gestureHoldRef.current.startTime >= 800) {
+                    gestureHoldRef.current = { gesture: "none", startTime: 0 };
+                    lastProcessedGestureRef.current = "thumbs_up";
+                    callbacksRef.current.handleConfirmPreview?.();
+                  }
+                } else if (result.gesture === "thumbs_down") {
+                  if (gestureHoldRef.current.gesture !== "thumbs_down") {
+                    gestureHoldRef.current = { gesture: "thumbs_down", startTime: Date.now() };
+                  } else if (Date.now() - gestureHoldRef.current.startTime >= 800) {
+                    gestureHoldRef.current = { gesture: "none", startTime: 0 };
+                    lastProcessedGestureRef.current = "thumbs_down";
+                    const targetPose = selectedRetakePoseRef.current ?? 0;
+                    callbacksRef.current.handleRetakeSpecificPose?.(targetPose);
+                  }
+                } else {
+                  gestureHoldRef.current = { gesture: "none", startTime: 0 };
+                }
+              } else {
+                gestureHoldRef.current = { gesture: "none", startTime: 0 };
+              }
+            }
+
+            // UPLOAD DIGITAL STEP: Voice input with Fist ✊ and Open Palm 🖐️
+            if (stepRef.current === "upload_digital") {
+              if (result.gesture === "fist" && canTriggerNewGestureAction) {
                 lastProcessedGestureRef.current = result.gesture;
-                gestureMustResetRef.current = true;
-                callbacksRef.current.handleAcceptAndNextPose?.();
+                callbacksRef.current.startRecordingVoice?.();
+              } else if (result.gesture === "open_palm" && canTriggerNewGestureAction) {
+                lastProcessedGestureRef.current = result.gesture;
+                callbacksRef.current.stopRecordingVoice?.();
               }
-            } else if (result.gesture === "thumbs_down") {
-              if (gestureHoldRef.current.gesture !== "thumbs_down") {
-                gestureHoldRef.current = { gesture: "thumbs_down", startTime: Date.now() };
-              } else if (Date.now() - gestureHoldRef.current.startTime >= 1000) {
-                gestureHoldRef.current = { gesture: "none", startTime: 0 };
-                lastProcessedGestureRef.current = "thumbs_down";
-                gestureMustResetRef.current = true;
-                callbacksRef.current.handleRetakeCurrentPose?.();
-              }
-            } else {
-              gestureHoldRef.current = { gesture: "none", startTime: 0 };
             }
-          } else {
-            gestureHoldRef.current = { gesture: "none", startTime: 0 };
-          }
-        }
-
-        // PREVIEW / RETAKE STEP: Deliberately HOLD Thumbs Up 👍 (Continue) / Thumbs Down 👎 (Retake) for 1000ms
-        if (stepRef.current === "preview_retake") {
-          const isSettled = Date.now() - stepEntryTimeRef.current > 1200;
-          if (isSettled) {
-            if (result.gesture === "thumbs_up") {
-              if (gestureHoldRef.current.gesture !== "thumbs_up") {
-                gestureHoldRef.current = { gesture: "thumbs_up", startTime: Date.now() };
-              } else if (Date.now() - gestureHoldRef.current.startTime >= 1000) {
-                gestureHoldRef.current = { gesture: "none", startTime: 0 };
-                lastProcessedGestureRef.current = "thumbs_up";
-                callbacksRef.current.handleConfirmPreview?.();
-              }
-            } else if (result.gesture === "thumbs_down") {
-              if (gestureHoldRef.current.gesture !== "thumbs_down") {
-                gestureHoldRef.current = { gesture: "thumbs_down", startTime: Date.now() };
-              } else if (Date.now() - gestureHoldRef.current.startTime >= 1000) {
-                gestureHoldRef.current = { gesture: "none", startTime: 0 };
-                lastProcessedGestureRef.current = "thumbs_down";
-                callbacksRef.current.handleRetake?.();
-              }
-            } else {
-              gestureHoldRef.current = { gesture: "none", startTime: 0 };
-            }
-          } else {
-            gestureHoldRef.current = { gesture: "none", startTime: 0 };
-          }
-        }
-
-        // UPLOAD DIGITAL STEP: Voice input with Fist ✊ and Open Palm 🖐️
-        if (stepRef.current === "upload_digital") {
-          if (result.gesture === "fist" && canTriggerNewGestureAction) {
-            lastProcessedGestureRef.current = result.gesture;
-            callbacksRef.current.startRecordingVoice?.();
-          } else if (result.gesture === "open_palm" && canTriggerNewGestureAction) {
-            lastProcessedGestureRef.current = result.gesture;
-            callbacksRef.current.stopRecordingVoice?.();
-          }
-        }
-      });
+          });
 
           mp.setTargetFPS(ACTIVE_FPS);
           mp.activate();
@@ -858,8 +861,8 @@ export default function BoothPage() {
               }
             };
           })
-          .catch(() => {});
-      } catch (_) {}
+          .catch(() => { });
+      } catch (_) { }
     }
 
     const handleBeforeUnload = () => {
@@ -884,9 +887,9 @@ export default function BoothPage() {
         if (!smoothCursorPosRef.current) {
           smoothCursorPosRef.current = { x: target.x, y: target.y };
         } else {
-          // Lerp factor 0.45: smooth out camera jitter, instant response, 60fps buttery movement
-          smoothCursorPosRef.current.x += (target.x - smoothCursorPosRef.current.x) * 0.45;
-          smoothCursorPosRef.current.y += (target.y - smoothCursorPosRef.current.y) * 0.45;
+          // Snappy 0.75 lerp: ultra fast, zero-delay cursor tracking with smooth motion
+          smoothCursorPosRef.current.x += (target.x - smoothCursorPosRef.current.x) * 0.75;
+          smoothCursorPosRef.current.y += (target.y - smoothCursorPosRef.current.y) * 0.75;
         }
         cursorPosRef.current = smoothCursorPosRef.current;
         if (cursorRef.current) {
@@ -986,6 +989,24 @@ export default function BoothPage() {
       const screenY = (currentPos.y / 100) * window.innerHeight;
       const elements = document.elementsFromPoint(screenX, screenY);
 
+      // In preview_retake: Any element with data-retake-index hovered by cursor selects that pose
+      if (currentStep === "preview_retake") {
+        for (const el of elements) {
+          const retakeEl = (el.getAttribute("data-retake-index") ? el : el.closest("[data-retake-index]")) as HTMLElement | null;
+          if (retakeEl) {
+            const rawIdx = retakeEl.getAttribute("data-retake-index");
+            if (rawIdx !== null) {
+              const idxNum = parseInt(rawIdx, 10);
+              if (!isNaN(idxNum) && selectedRetakePoseRef.current !== idxNum) {
+                selectedRetakePoseRef.current = idxNum;
+                setSelectedRetakePose(idxNum);
+              }
+            }
+            break;
+          }
+        }
+      }
+
       let interactiveTarget: HTMLElement | null = null;
       for (const el of elements) {
         // Support cards with data-dwell-id, buttons, and custom button roles
@@ -1048,9 +1069,14 @@ export default function BoothPage() {
           setHoveredItemId(targetId);
           updateDwellProgressDOM(0, interactiveTarget);
         } else {
-          // Continuing hover on the same target: increment progress smoothly via DOM (NO React re-render)
+          // Only the preview toggle button (btn-toggle-frame-preview) confirms in 800ms (2x faster)
+          // All other buttons, packages, and cards across the app strictly use DWELL_LOCK_MS (1800ms)
+          const isPreviewToggle =
+            interactiveTarget.getAttribute("data-dwell-id") === "btn-toggle-frame-preview" ||
+            interactiveTarget.id === "btn-toggle-frame-preview";
+          const targetLockMs = isPreviewToggle ? 800 : DWELL_LOCK_MS;
           const elapsed = Date.now() - dwellStartTimeRef.current;
-          const pct = Math.min(100, Math.round((elapsed / DWELL_LOCK_MS) * 100));
+          const pct = Math.min(100, Math.round((elapsed / targetLockMs) * 100));
           updateDwellProgressDOM(pct, interactiveTarget);
 
           if (pct >= 100) {
@@ -1235,6 +1261,22 @@ export default function BoothPage() {
     setStep("pose_ready");
   }, [setStep]);
 
+  // Handler: Foto ulang pose tertentu pilihan user dari pratinjau akhir (fleksibel dan leluasa)
+  const handleRetakeSpecificPose = useCallback(
+    (poseIdx: number) => {
+      currentPoseIndexRef.current = poseIdx;
+      setCurrentPoseIndex(poseIdx);
+      const next = [...capturedPhotosRef.current];
+      next[poseIdx] = "";
+      capturedPhotosRef.current = next;
+      setCapturedPhotos(next);
+      gestureMustResetRef.current = true;
+      lastProcessedGestureRef.current = "none";
+      setStep("pose_ready");
+    },
+    [setStep]
+  );
+
   // Handler: Terima foto ini dan lanjut ke pose berikutnya / review strip final
   const handleAcceptAndNextPose = useCallback(() => {
     if (isProcessingPoseAdvanceRef.current) return;
@@ -1243,29 +1285,29 @@ export default function BoothPage() {
       isProcessingPoseAdvanceRef.current = false;
     }, 1000);
 
-    const currentIdx = currentPoseIndexRef.current;
-    const nextPoseIdx = currentIdx + 1;
-    if (nextPoseIdx < totalPoses) {
-      currentPoseIndexRef.current = nextPoseIdx;
-      setCurrentPoseIndex(nextPoseIdx);
+    const photos = capturedPhotosRef.current;
+    // Cari apakah masih ada slot foto yang belum diambil (dari indeks 0 sampai totalPoses - 1)
+    let nextEmptyIdx = -1;
+    for (let i = 0; i < totalPoses; i++) {
+      if (!photos[i]) {
+        nextEmptyIdx = i;
+        break;
+      }
+    }
+
+    if (nextEmptyIdx !== -1) {
+      currentPoseIndexRef.current = nextEmptyIdx;
+      setCurrentPoseIndex(nextEmptyIdx);
       gestureMustResetRef.current = true;
       lastProcessedGestureRef.current = "peace";
-      // Pindah ke pose_ready foto berikutnya (Harus pose Peace lagi, TIDAK otomatis detik!)
+      // Pindah ke pose_ready slot foto berikutnya (Wajib pose Peace lagi)
       setStep("pose_ready");
     } else {
-      // Semua pose sudah lengkap! Buat photostrip komposit 300 DPI
+      // Semua pose sudah lengkap! Lanjut ke processing komposit dan buka preview_retake
       setIsCompositingPreview(true);
-      const frame = selectedTheme || FRAMES[0];
       setStep("processing");
-      const photos = capturedPhotosRef.current.filter(Boolean);
-      compositePhotosIntoFrame(photos, frame).then((base64) => {
-        photostripBase64Ref.current = base64;
-        setPreviewStripUrl(base64);
-        setIsCompositingPreview(false);
-        setStep("preview_retake");
-      });
     }
-  }, [totalPoses, selectedTheme, setStep]);
+  }, [totalPoses, setStep]);
 
   // ===== PROCESSING (CANVAS COMPOSITING 300 DPI) =====
   useEffect(() => {
@@ -1281,18 +1323,24 @@ export default function BoothPage() {
         });
       }, 300);
 
-      generateFilmStrip(capturedPhotos).then((base64) => {
+      const frame = selectedTheme || FRAMES[0];
+      const validPhotos = capturedPhotosRef.current.filter(Boolean);
+      compositePhotosIntoFrame(validPhotos, frame).then((base64) => {
         photostripBase64Ref.current = base64;
+        setPreviewStripUrl(base64);
+        setIsCompositingPreview(false);
         clearInterval(progTimer);
         setProcessProgress(100);
         setTimeout(() => {
-          setStep("print_session");
-        }, 500);
+          setSelectedRetakePose(0);
+          selectedRetakePoseRef.current = 0;
+          setStep("preview_retake");
+        }, 400);
       });
 
       return () => clearInterval(progTimer);
     }
-  }, [step, capturedPhotos, generateFilmStrip, setStep]);
+  }, [step, selectedTheme, setStep]);
 
   // ===== QR DOWNLOAD AUTO-RESET (20S) =====
   useEffect(() => {
@@ -1353,6 +1401,8 @@ export default function BoothPage() {
     isProcessingPoseAdvanceRef.current = false;
     photostripBase64Ref.current = "";
     lastProcessedGestureRef.current = "none";
+    setSelectedRetakePose(0);
+    selectedRetakePoseRef.current = 0;
     setStep("welcome_intro");
   };
 
@@ -1434,6 +1484,7 @@ export default function BoothPage() {
     handleConfirmPreview,
     handleRetake,
     handleRetakeCurrentPose,
+    handleRetakeSpecificPose,
     handleAcceptAndNextPose,
     startRecordingVoice,
     stopRecordingVoice,
@@ -1479,12 +1530,6 @@ export default function BoothPage() {
       {/* Dark Studio Vignette Overlay */}
       <div className="absolute inset-0 camera-vignette pointer-events-none" />
 
-      {/* Framing Corner Brackets */}
-      <div className="camera-bracket-tl opacity-50 pointer-events-none z-30" />
-      <div className="camera-bracket-tr opacity-50 pointer-events-none z-30" />
-      <div className="camera-bracket-bl opacity-50 pointer-events-none z-30" />
-      <div className="camera-bracket-br opacity-50 pointer-events-none z-30" />
-
       {/* Custom Animated Camera Pop-Out Permission & Status Modal */}
       <CameraPermissionModal
         status={cameraStatus}
@@ -1506,53 +1551,53 @@ export default function BoothPage() {
         active={step === "pose_ready" || step === "countdown"}
       />
 
-      {/* ===== LIVE FRAME PREVIEW DI POJOK KANAN (TOMBOL DI SAMPING KIRI FRAME) ===== */}
+      {/* ===== LIVE FRAME PREVIEW DI POJOK KANAN (TOMBOL DI SEBELAH KIRI FRAME DENGAN CHEVRON) ===== */}
       {(step === "pose_ready" || step === "countdown" || step === "photo_review_single") && (
         <div className="fixed right-4 top-1/2 -translate-y-1/2 z-40 hidden md:flex flex-row items-center gap-2.5 pointer-events-auto">
-          {/* Toggle Button: Terletak persis di samping kiri bingkai foto preview */}
+          {/* Toggle Button: Tepat di sebelah kiri preview frame, posisi terkunci (tidak melompat saat buka/tutup) */}
           <button
             type="button"
             data-dwell-id="btn-toggle-frame-preview"
+            data-dwell-time="800"
             onClick={(e) => {
               e.stopPropagation();
               setIsFramePreviewOpen((prev) => !prev);
             }}
-            className="px-3 py-2.5 rounded-2xl bg-[#10111c]/95 hover:bg-[#1a1d2e] border border-[#292b3b] hover:border-[#f0a25c] text-white text-xs font-mono-tech flex items-center gap-1.5 shadow-2xl transition-all cursor-pointer pointer-events-auto select-none backdrop-blur-md active:scale-95"
+            className="px-3.5 py-3 rounded-2xl bg-[#10111c]/40 hover:bg-[#1a1d2e] border border-[#292b3b] hover:border-[#f0a25c] text-white text-xs font-mono-tech flex items-center gap-1.5 shadow-2xl transition-all cursor-pointer pointer-events-auto select-none backdrop-blur-md active:scale-95 shrink-0"
             title={isFramePreviewOpen ? "Tutup Preview" : "Buka Frame Preview"}
           >
             {isFramePreviewOpen ? (
               <>
-                <ChevronRight className="w-4 h-4 text-[#f0a25c]" />
-                <span className="text-[11px] text-[#ced0dc] font-semibold whitespace-nowrap">Tutup</span>
+                <ChevronRight className="w-5 h-5 text-[#f0a25c]" />
+                <span className="text-xs text-[#ced0dc] font-semibold whitespace-nowrap">
+                  Tutup
+                </span>
               </>
             ) : (
               <>
-                <ChevronLeft className="w-4 h-4 text-[#f0a25c]" />
-                <span className="text-[11px] text-[#f0a25c] font-bold whitespace-nowrap">Preview</span>
+                <ChevronLeft className="w-5 h-5 text-[#f0a25c]" />
+                <span className="text-xs text-[#ced0dc] font-semibold whitespace-nowrap">
+                  Preview
+                </span>
               </>
             )}
           </button>
 
-          {/* Animated Preview Container */}
-          <AnimatePresence>
-            {isFramePreviewOpen && (
-              <motion.div
-                initial={{ opacity: 0, x: 40, scale: 0.95 }}
-                animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, x: 40, scale: 0.95 }}
-                transition={{ duration: 0.25 }}
-                className="pointer-events-auto"
-              >
-                <LiveFramePreview
-                  frame={selectedTheme || FRAMES[0]}
-                  capturedPhotos={capturedPhotos}
-                  currentPoseIndex={currentPoseIndex}
-                  totalPoses={totalPoses}
-                  onClose={() => setIsFramePreviewOpen(false)}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Frame Preview Container (Menahan posisi agar tombol di sebelah kiri tidak melompat) */}
+          <div
+            className={`transition-all duration-300 ease-out origin-right ${isFramePreviewOpen
+              ? "opacity-100 scale-100 pointer-events-auto"
+              : "opacity-0 scale-95 pointer-events-none"
+              }`}
+          >
+            <LiveFramePreview
+              frame={selectedTheme || FRAMES[0]}
+              capturedPhotos={capturedPhotos}
+              currentPoseIndex={currentPoseIndex}
+              totalPoses={totalPoses}
+              onClose={() => setIsFramePreviewOpen(false)}
+            />
+          </div>
         </div>
       )}
 
@@ -1612,8 +1657,8 @@ export default function BoothPage() {
       {cameraReady && step !== "welcome_intro" && step !== "thank_you" && (
         <div className="fixed bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 z-[45] pointer-events-none select-none">
           <div
-            className={`px-5 py-2 rounded-full border backdrop-blur-md shadow-2xl flex items-center gap-3 transition-all duration-200 ${!isHandDetected
-              ? "bg-[#10111c]/85 border-[#292b3b] text-[#9b9eaf]"
+            className={`px-5 py-2 rounded-lg border backdrop-blur-md shadow-2xl flex items-center gap-3 transition-all duration-200 ${!isHandDetected
+              ? "bg-[#10111c]/45 border-[#292b3b] text-[#9b9eaf]"
               : lastDetectedGesture === "peace"
                 ? "bg-[#246cff]/25 border-[#246cff]/70 text-white shadow-[0_0_25px_rgba(36,108,255,0.5)]"
                 : lastDetectedGesture === "pointing"
@@ -1624,16 +1669,12 @@ export default function BoothPage() {
                       ? "bg-rose-500/20 border-rose-500/70 text-white shadow-[0_0_20px_rgba(244,63,94,0.45)]"
                       : lastDetectedGesture === "wave"
                         ? "bg-[#ff7b00]/20 border-[#ff7b00]/70 text-white shadow-[0_0_20px_rgba(255,123,0,0.4)]"
-                        : "bg-[#10111c]/90 border-[#292b3b] text-white"
+                        : "bg-[#10111c]/45 border-[#292b3b] text-white"
               }`}
           >
-            <div
-              className={`w-3 h-3 rounded-full ${!isHandDetected ? "bg-gray-500" : "bg-emerald-400 animate-pulse"
-                }`}
-            />
             <span className="font-mono-tech text-xs tracking-wider uppercase font-bold">
               {!isHandDetected ? (
-                <span className="text-[#9b9eaf]">✋Angkat Tangan</span>
+                <span className="text-[#9b9eaf]">✋ Angkat Tangan</span>
               ) : lastDetectedGesture === "peace" ? (
                 <span className="text-white flex items-center gap-1.5">
                   <span className="text-sm">✌️</span>
@@ -1642,17 +1683,17 @@ export default function BoothPage() {
               ) : lastDetectedGesture === "pointing" ? (
                 <span className="text-white flex items-center gap-1.5">
                   <span className="text-sm">👆</span>
-                  <span>Gestur: Telunjuk (Kursor Aktif)</span>
+                  <span>Gestur: Telunjuk</span>
                 </span>
               ) : lastDetectedGesture === "thumbs_up" ? (
                 <span className="text-emerald-300 flex items-center gap-1.5">
                   <span className="text-sm">👍</span>
-                  <span>Gestur: Jempol Atas (Lanjut)</span>
+                  <span>Gestur: Jempol Atas</span>
                 </span>
               ) : lastDetectedGesture === "thumbs_down" ? (
                 <span className="text-rose-300 flex items-center gap-1.5">
                   <span className="text-sm">👎</span>
-                  <span>Gestur: Jempol Bawah (Foto Ulang)</span>
+                  <span>Gestur: Jempol Bawah</span>
                 </span>
               ) : lastDetectedGesture === "wave" ? (
                 <span className="text-[#f0a25c] flex items-center gap-1.5">
@@ -2449,7 +2490,7 @@ export default function BoothPage() {
             </div>
 
             {/* Center Call-to-Action Card */}
-            <div className="max-w-md bg-[#10111c]/90 backdrop-blur-md p-6 sm:p-8 rounded-3xl border border-[#292b3b] shadow-2xl">
+            <div className="max-w-md bg-[#10111c]/60 backdrop-blur-md p-6 sm:p-8 rounded-3xl border border-[#292b3b] shadow-2xl">
               <h2 className="text-3xl sm:text-4xl font-black text-white mb-2 tracking-tight">
                 Pose Ke-{currentPoseIndex + 1}
               </h2>
@@ -2562,7 +2603,7 @@ export default function BoothPage() {
                   <div className="font-bold flex items-center gap-1.5">
                     <span>
                       {currentPoseIndex + 1 < totalPoses
-                        ? `Lanjut Foto-${currentPoseIndex + 2}`
+                        ? `Lanjut Foto`
                         : "Selesai"}
                     </span>
                   </div>
@@ -2606,60 +2647,188 @@ export default function BoothPage() {
             exit={{ opacity: 0, scale: 0.95 }}
             className="absolute inset-0 z-30 bg-[#090a12]/85 backdrop-blur-md flex flex-col items-center justify-between p-6 sm:p-8 text-center"
           >
-            {/* Top Action Bar (Vertically Lowered for Comfort) */}
-            <div className="w-full max-w-4xl flex items-center justify-between gap-3 pt-6 sm:pt-10">
+            {/* Top Action Bar */}
+            <div className="w-full max-w-5xl flex items-center justify-between gap-3 pt-4 sm:pt-6">
               <button
                 data-dwell-id="btn-retake-all-poses"
                 onClick={handleRetake}
-                className="px-6 py-3.5 bg-[#171927]/90 hover:bg-[#202336] text-white rounded-2xl border border-[#292b3b] font-bold text-xs sm:text-sm tracking-wider uppercase transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95"
+                className="px-5 py-3 bg-[#171927]/90 hover:bg-[#202336] text-white rounded-2xl border border-[#292b3b] font-bold text-xs sm:text-sm tracking-wider uppercase transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95 shrink-0"
               >
                 <RotateCcw className="w-4 h-4 text-rose-400 shrink-0" />
                 <span>Foto Ulang Semua</span>
               </button>
 
-              <div>
-                <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
+              <div className="px-2">
+                <h2 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
                   Pratinjau Hasil Akhir
                 </h2>
                 <p className="text-[#9b9eaf] text-xs sm:text-sm mt-0.5">
-                  Foto Anda telah terpasang rapi ke dalam bingkai pilihan
+                  Arahkan kursor ke foto untuk memilih • Beri gestur 👎 jempol bawah untuk ulang
                 </p>
               </div>
 
               <button
                 data-dwell-id="btn-confirm-print"
                 onClick={handleConfirmPreview}
-                className="px-8 py-3.5 bg-[#246cff] hover:bg-[#4d87ff] text-white rounded-2xl font-bold text-xs sm:text-sm tracking-wider uppercase transition-all flex items-center justify-center gap-2 shadow-[0_4px_25px_rgba(36,108,255,0.4)] whitespace-nowrap"
+                className="px-6 sm:px-8 py-3 bg-[#246cff] hover:bg-[#4d87ff] text-white rounded-2xl font-bold text-xs sm:text-sm tracking-wider uppercase transition-all flex items-center justify-center gap-2 shadow-[0_4px_25px_rgba(36,108,255,0.4)] whitespace-nowrap shrink-0"
               >
                 <Check className="w-4 h-4 shrink-0" />
                 <span>Lanjut Cetak</span>
               </button>
             </div>
 
-            {/* Assembled Photostrip (Photo + Frame) Preview */}
-            <div className="my-auto flex items-center justify-center max-w-full max-h-[58vh] p-2">
-              {previewStripUrl || photostripBase64Ref.current ? (
-                <div className="relative rounded-3xl overflow-hidden shadow-[0_15px_50px_rgba(0,0,0,0.9)] border-2 border-[#292b3b] bg-[#10111c]/90 max-h-[54vh] flex items-center justify-center p-2">
-                  <img
-                    src={previewStripUrl || photostripBase64Ref.current}
-                    alt="Hasil Foto dan Frame"
-                    className="max-h-[50vh] object-contain rounded-2xl shadow-lg"
-                  />
+            {/* Main Content Area: Side-by-Side Strip Preview (Left) and Vertical Photo Retake Selector (Right) */}
+            <div className="my-auto flex flex-col md:flex-row items-center justify-center gap-6 lg:gap-10 w-full max-w-5xl px-4 py-2">
+              {/* KIRI: Pratinjau Photostrip Lengkap (Frame + Foto) */}
+              <div className="flex flex-col items-center justify-center shrink-0">
+                <div className="relative rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.9)] border-2 border-[#292b3b] bg-[#10111c]/90 p-2.5 max-h-[56vh] flex items-center justify-center">
+                  {previewStripUrl || photostripBase64Ref.current ? (
+                    <img
+                      src={previewStripUrl || photostripBase64Ref.current}
+                      alt="Hasil Foto dan Frame"
+                      className="max-h-[50vh] object-contain rounded-2xl shadow-xl"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center gap-3 p-10">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-10 h-10 border-3 border-[#f0a25c] border-t-transparent rounded-full"
+                      />
+                      <span className="text-white text-sm">Menyusun strip foto...</span>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="flex flex-col items-center gap-3 p-8">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="w-10 h-10 border-3 border-[#f0a25c] border-t-transparent rounded-full"
-                  />
-                  <span className="text-white text-sm">Menyusun strip foto...</span>
+              </div>
+
+              {/* KANAN: Daftar Vertikal Foto untuk Dipilih & Diulang */}
+              <div className="flex flex-col w-full max-w-md bg-[#10111c]/95 border border-[#292b3b] rounded-3xl p-4 sm:p-5 shadow-2xl backdrop-blur-md">
+                <div className="flex items-center justify-between pb-3 border-b border-[#292b3b]/80 mb-3">
+                  <div className="flex items-center gap-2.5 text-left">
+                    <div className="w-8 h-8 rounded-xl bg-[#f0a25c]/15 text-[#f0a25c] flex items-center justify-center shrink-0">
+                      <RotateCcw className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm sm:text-base font-bold text-white tracking-wide">
+                        Pilih Foto yang Ingin Diulang
+                      </h3>
+                      <p className="text-[11px] text-[#9b9eaf]">
+                        Arahkan kursor untuk memilih, beri gestur 👎 untuk ulang
+                      </p>
+                    </div>
+                  </div>
+                  {selectedRetakePose !== null && (
+                    <div className="px-2.5 py-1 rounded-full bg-[#f0a25c]/20 border border-[#f0a25c]/40 text-[#f0a25c] text-xs font-mono-tech font-bold shrink-0 animate-pulse">
+                      Foto #{selectedRetakePose + 1}
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {/* Vertical List of Photo Cards */}
+                <div className="flex flex-col gap-2.5 max-h-[44vh] overflow-y-auto pr-1">
+                  {Array.from({ length: totalPoses }).map((_, idx) => {
+                    const photo = capturedPhotos[idx];
+                    const isSelected = selectedRetakePose === idx;
+                    return (
+                      <div
+                        key={idx}
+                        data-retake-index={idx}
+                        data-dwell-id={`card-retake-pose-${idx}`}
+                        onClick={() => {
+                          selectedRetakePoseRef.current = idx;
+                          setSelectedRetakePose(idx);
+                        }}
+                        onMouseEnter={() => {
+                          selectedRetakePoseRef.current = idx;
+                          setSelectedRetakePose(idx);
+                        }}
+                        className={`group relative rounded-2xl p-2 sm:p-2.5 border transition-all duration-200 flex items-center justify-between gap-3 cursor-pointer select-none ${
+                          isSelected
+                            ? "bg-[#1d2035] border-[#f0a25c] ring-2 ring-[#f0a25c]/50 shadow-[0_0_20px_rgba(240,162,92,0.25)] scale-[1.01]"
+                            : "bg-[#151726]/80 border-[#292b3b] hover:border-[#3d4158] hover:bg-[#1a1d2e]"
+                        }`}
+                      >
+                        {/* Thumbnail + Info */}
+                        <div className="flex items-center gap-3">
+                          <div className="relative w-14 h-12 sm:w-16 sm:h-14 rounded-xl overflow-hidden bg-black/70 border border-[#292b3b] shrink-0">
+                            {photo ? (
+                              <img
+                                src={photo}
+                                alt={`Pose ${idx + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-[10px] text-[#6b6f8a]">
+                                Kosong
+                              </div>
+                            )}
+                            <div className="absolute top-0.5 left-0.5 px-1.5 py-0.5 rounded-md bg-black/85 font-mono-tech text-[10px] text-white font-bold">
+                              #{idx + 1}
+                            </div>
+                          </div>
+
+                          <div className="text-left">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs sm:text-sm font-bold text-white">
+                                Foto Pose #{idx + 1}
+                              </span>
+                              {isSelected && (
+                                <span className="text-[9px] font-mono-tech px-1.5 py-0.5 rounded bg-[#f0a25c] text-black font-extrabold uppercase">
+                                  Terpilih
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-[#9b9eaf] mt-0.5">
+                              {isSelected
+                                ? "Tahan 👎 jempol bawah untuk ulang"
+                                : "Arahkan kursor ke sini untuk pilih"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Direct Button */}
+                        <button
+                          type="button"
+                          data-dwell-id={`btn-retake-pose-${idx}`}
+                          data-retake-index={idx}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRetakeSpecificPose(idx);
+                          }}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 shadow-md ${
+                            isSelected
+                              ? "bg-rose-600 hover:bg-rose-500 text-white shadow-[0_2px_12px_rgba(225,29,72,0.4)]"
+                              : "bg-[#202336] hover:bg-rose-600/80 text-rose-300 hover:text-white"
+                          }`}
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Ulang #{idx + 1}</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Gesture Helper Pills */}
+                <div className="mt-3 pt-3 border-t border-[#292b3b]/70 flex items-center justify-between text-xs text-[#ced0dc]">
+                  <div className="flex items-center gap-1.5 text-left">
+                    <span className="text-sm">👎</span>
+                    <span className="text-[11px]">
+                      Jempol Bawah: <strong className="text-rose-400">Ulang Terpilih</strong>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-right">
+                    <span className="text-sm">👍</span>
+                    <span className="text-[11px]">
+                      Jempol Atas: <strong className="text-emerald-400">Lanjut Cetak</strong>
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Bottom spacer */}
-            <div className="h-4" />
+            <div className="h-2" />
           </motion.div>
         )}
       </AnimatePresence>

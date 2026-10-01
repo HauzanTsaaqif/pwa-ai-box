@@ -33,14 +33,7 @@ export default function SlotGuideSilhouette({
           transition={{ duration: 0.35, ease: "easeOut" }}
           className="absolute inset-0 flex items-center justify-center"
         >
-          {/* Full Screen Viewfinder Boundary (Spacious, matches camera feed without dark clipping) */}
-          <div className="absolute inset-4 sm:inset-6 md:inset-8 rounded-3xl border border-[#f0a25c]/30 pointer-events-none transition-all duration-300">
-            {/* Viewfinder 4 Corner Brackets */}
-            <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-[#f0a25c] rounded-tl-2xl shadow-[0_0_15px_rgba(240,162,92,0.6)]" />
-            <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-[#f0a25c] rounded-tr-2xl shadow-[0_0_15px_rgba(240,162,92,0.6)]" />
-            <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-[#f0a25c] rounded-bl-2xl shadow-[0_0_15px_rgba(240,162,92,0.6)]" />
-            <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-[#f0a25c] rounded-br-2xl shadow-[0_0_15px_rgba(240,162,92,0.6)]" />
-          </div>
+
 
           {/* If Circle Slot: Spacious circular guide without obscuring the camera */}
           {isCircle && (
