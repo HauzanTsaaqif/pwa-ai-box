@@ -3,6 +3,7 @@ export interface FrameSlot {
   y: number;
   width: number;
   height: number;
+  shape?: "circle" | "rect" | "rounded";
 }
 
 export interface FrameTemplate {
@@ -118,7 +119,7 @@ export const FRAMES: FrameTemplate[] = [
     accentHex: "#ec4899",
     borderHex: "#fbcfe8",
     slots: [
-      { x: 147, y: 207, width: 461, height: 460 },
+      { x: 147, y: 207, width: 461, height: 460, shape: "circle" },
       { x: 719, y: 703, width: 388, height: 520 },
       { x: 174, y: 1104, width: 345, height: 463 },
     ],
