@@ -16,9 +16,11 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import Logo from "@/components/Logo";
+import { isLoggedIn } from "@/lib/auth";
 
 export default function LandingPage() {
   const [mounted, setMounted] = useState(false);
+  const [targetBoothUrl, setTargetBoothUrl] = useState("/login");
   const [cameraFlash, setCameraFlash] = useState(false);
   const [boxFlash, setBoxFlash] = useState(false);
   const [isFocusing, setIsFocusing] = useState(false);
@@ -28,6 +30,9 @@ export default function LandingPage() {
 
   useEffect(() => {
     setMounted(true);
+    if (isLoggedIn()) {
+      setTargetBoothUrl("/booth");
+    }
   }, []);
 
   const handleMouseEnterText = () => {
@@ -107,7 +112,7 @@ export default function LandingPage() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <Link href="/login">
+            <Link href={targetBoothUrl}>
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -217,7 +222,7 @@ export default function LandingPage() {
           transition={{ duration: 0.7, delay: 0.3 }}
           className="flex flex-col sm:flex-row items-center justify-center gap-3.5 mb-14 w-full sm:w-auto"
         >
-          <Link href="/login" className="w-full sm:w-auto">
+          <Link href={targetBoothUrl} className="w-full sm:w-auto">
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}

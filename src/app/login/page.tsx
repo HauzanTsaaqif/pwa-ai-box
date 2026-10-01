@@ -26,22 +26,14 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [mounted, setMounted] = useState(false);
-  const [activeSessionUser, setActiveSessionUser] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
-    const session = getSession();
-    if (session) {
-      setActiveSessionUser(session.username);
+    // If admin is already logged in, automatically go straight to booth (no session prompt!)
+    if (isLoggedIn()) {
+      router.replace("/booth");
     }
-  }, []);
-
-  const handleLogoutExisting = () => {
-    clearSession();
-    setActiveSessionUser(null);
-    setUsername("");
-    setPassword("");
-  };
+  }, [router]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -100,7 +92,7 @@ export default function LoginPage() {
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-            AI Box Kiosk Console
+            AI Box Kiosk Login
           </h1>
           <p className="text-[#9b9eaf] text-xs sm:text-sm mt-1.5 font-normal">
             Masuk untuk mengaktifkan sesi kamera & sensor interaktif
@@ -109,40 +101,8 @@ export default function LoginPage() {
 
         {/* Clean Editorial Card */}
         <div className="bg-[#10111c] rounded-2xl p-7 sm:p-8 shadow-2xl relative border border-[#292b3b]">
-          {activeSessionUser ? (
-            <div className="space-y-4 text-center">
-              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-                <p className="text-xs uppercase font-mono-tech tracking-wider text-emerald-300 font-semibold mb-1">
-                  Sesi Aktif Terdeteksi
-                </p>
-                <p className="text-sm font-bold text-white">
-                  Terhubung sebagai: <span className="text-[#f0a25c]">{activeSessionUser}</span>
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2.5 pt-2">
-                <button
-                  type="button"
-                  onClick={() => router.push("/booth")}
-                  className="w-full py-3.5 bg-[#246cff] hover:bg-[#4d87ff] text-white rounded-xl font-semibold text-sm tracking-wide shadow-[0_4px_20px_rgba(36,108,255,0.35)] transition-all flex items-center justify-center gap-2"
-                >
-                  <Camera className="w-4 h-4" />
-                  <span>Buka Layar Photobooth</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleLogoutExisting}
-                  className="w-full py-3 bg-[#171927] hover:bg-rose-500/20 text-[#9b9eaf] hover:text-rose-400 border border-[#292b3b] hover:border-rose-500/30 rounded-xl font-medium text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Keluar / Ganti Akun Operator</span>
-                </button>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Username Input */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Username Input */}
             <div>
               <label className="block text-xs font-mono-tech tracking-wider uppercase text-[#9b9eaf] mb-1.5 font-medium">
                 Operator ID / Username
@@ -229,7 +189,6 @@ export default function LoginPage() {
               )}
             </motion.button>
           </form>
-        )}
 
           {/* Quick Credential Hint */}
           <div className="mt-5 pt-4 border-t border-[#292b3b] text-center">
@@ -247,7 +206,7 @@ export default function LoginPage() {
             className="text-[#9b9eaf] hover:text-[#f0a25c] text-xs font-mono-tech transition-colors inline-flex items-center gap-1.5 group"
           >
             <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" />
-            <span>Kembali ke Halaman Publik</span>
+            <span>Kembali Halaman Publik</span>
           </a>
         </div>
       </motion.div>

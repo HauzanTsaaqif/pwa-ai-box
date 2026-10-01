@@ -316,7 +316,7 @@ export class MediaPipeManager {
       }
     }
 
-    if (totalDisplacement >= 0.045 && directionChanges >= 1) {
+    if (totalDisplacement >= 0.12 && directionChanges >= 3) {
       this.xHistory = [];
       this.lastWaveTime = now;
       return true;

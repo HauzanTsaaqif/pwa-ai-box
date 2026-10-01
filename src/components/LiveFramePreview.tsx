@@ -3,7 +3,7 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FrameTemplate } from "@/lib/frames";
-import { Sparkles, Camera, Check } from "lucide-react";
+import { Sparkles, Camera, Check, X } from "lucide-react";
 
 interface LiveFramePreviewProps {
   frame: FrameTemplate;
@@ -11,6 +11,7 @@ interface LiveFramePreviewProps {
   currentPoseIndex: number;
   totalPoses: number;
   className?: string;
+  onClose?: () => void;
 }
 
 export default function LiveFramePreview({
@@ -19,6 +20,7 @@ export default function LiveFramePreview({
   currentPoseIndex,
   totalPoses,
   className = "",
+  onClose,
 }: LiveFramePreviewProps) {
   const isStrip = frame.formatId === "strip_2x6";
   const aspectRatio = frame.width / frame.height; // e.g. 600/1800 = 0.333, or 1200/1800 = 0.666
@@ -26,17 +28,32 @@ export default function LiveFramePreview({
   return (
     <div
       className={`flex flex-col items-center select-none ${className}`}
-      style={{ pointerEvents: "none" }}
     >
-      {/* Header Info Tag */}
-      <div className="mb-2 px-3 py-1 rounded-xl bg-[#10111c]/90 border border-[#292b3b] shadow-xl backdrop-blur-md flex items-center gap-2">
-        <Sparkles className="w-3.5 h-3.5 text-[#f0a25c]" />
-        <span className="font-mono-tech text-[11px] font-bold text-white tracking-wider uppercase">
-          Posisi Frame (Alur Z)
-        </span>
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#246cff]/20 text-[#246cff] font-bold">
-          {capturedPhotos.filter(Boolean).length}/{totalPoses}
-        </span>
+      {/* Header Info Tag with Close Button */}
+      <div className="mb-2 px-3 py-1.5 rounded-xl bg-[#10111c]/95 border border-[#292b3b] shadow-xl backdrop-blur-md flex items-center justify-between gap-2.5 w-full">
+        <div className="flex items-center gap-2">
+          <span className="font-mono-tech text-[11px] font-bold text-white tracking-wider uppercase">
+            Preview
+          </span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#246cff]/20 text-[#246cff] font-bold">
+            {capturedPhotos.filter(Boolean).length}/{totalPoses}
+          </span>
+        </div>
+
+        {onClose && (
+          <button
+            type="button"
+            data-dwell-id="btn-close-frame-preview-header"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="w-5 h-5 rounded-md bg-[#171927] hover:bg-rose-500/30 text-[#ced0dc] hover:text-rose-300 flex items-center justify-center transition-all cursor-pointer pointer-events-auto active:scale-90"
+            title="Tutup Preview"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Frame Scaled Container */}
@@ -99,21 +116,18 @@ export default function LiveFramePreview({
                 </motion.div>
               ) : (
                 <div
-                  className={`w-full h-full flex flex-col items-center justify-center text-center p-1 transition-all ${
-                    isCurrentActive
-                      ? "bg-[#ff7b00]/25 border-2 border-[#ff7b00] shadow-[inset_0_0_12px_rgba(255,123,0,0.5)] animate-pulse"
-                      : "bg-[#090a12]/70 border border-dashed border-[#454964]"
-                  }`}
+                  className={`w-full h-full flex flex-col items-center justify-center text-center p-1 transition-all ${isCurrentActive
+                    ? "bg-[#ff7b00]/25 border-2 border-[#ff7b00] shadow-[inset_0_0_12px_rgba(255,123,0,0.5)] animate-pulse"
+                    : "bg-[#090a12]/70 border border-dashed border-[#454964]"
+                    }`}
                 >
                   <Camera
-                    className={`w-4 h-4 mb-0.5 ${
-                      isCurrentActive ? "text-[#ff7b00]" : "text-[#6b6f8a]"
-                    }`}
+                    className={`w-4 h-4 mb-0.5 ${isCurrentActive ? "text-[#ff7b00]" : "text-[#6b6f8a]"
+                      }`}
                   />
                   <span
-                    className={`font-mono-tech text-[10px] font-bold uppercase leading-none ${
-                      isCurrentActive ? "text-white" : "text-[#878ba3]"
-                    }`}
+                    className={`font-mono-tech text-[10px] font-bold uppercase leading-none ${isCurrentActive ? "text-white" : "text-[#878ba3]"
+                      }`}
                   >
                     Foto {photoIndex + 1}
                   </span>
