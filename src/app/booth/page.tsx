@@ -1553,7 +1553,7 @@ export default function BoothPage() {
 
       {/* ===== LIVE FRAME PREVIEW DI POJOK KANAN (TOMBOL DI SEBELAH KIRI FRAME DENGAN CHEVRON) ===== */}
       {(step === "pose_ready" || step === "countdown" || step === "photo_review_single") && (
-        <div className="fixed right-4 top-1/2 -translate-y-1/2 z-40 hidden md:flex flex-row items-center gap-2.5 pointer-events-auto">
+        <div className="fixed right-3 sm:right-4 top-1/2 -translate-y-1/2 z-40 flex flex-row items-center gap-2 pointer-events-auto scale-90 sm:scale-100 origin-right">
           {/* Toggle Button: Tepat di sebelah kiri preview frame, posisi terkunci (tidak melompat saat buka/tutup) */}
           <button
             type="button"
@@ -1563,20 +1563,20 @@ export default function BoothPage() {
               e.stopPropagation();
               setIsFramePreviewOpen((prev) => !prev);
             }}
-            className="px-3.5 py-3 rounded-2xl bg-[#10111c]/40 hover:bg-[#1a1d2e] border border-[#292b3b] hover:border-[#f0a25c] text-white text-xs font-mono-tech flex items-center gap-1.5 shadow-2xl transition-all cursor-pointer pointer-events-auto select-none backdrop-blur-md active:scale-95 shrink-0"
+            className="px-3 py-2.5 sm:px-3.5 sm:py-3 rounded-2xl bg-[#10111c]/60 hover:bg-[#1a1d2e] border border-[#292b3b] hover:border-[#f0a25c] text-white text-xs font-mono-tech flex items-center gap-1.5 shadow-xl transition-all cursor-pointer pointer-events-auto select-none backdrop-blur-md active:scale-95 shrink-0"
             title={isFramePreviewOpen ? "Tutup Preview" : "Buka Frame Preview"}
           >
             {isFramePreviewOpen ? (
               <>
-                <ChevronRight className="w-5 h-5 text-[#f0a25c]" />
-                <span className="text-xs text-[#ced0dc] font-semibold whitespace-nowrap">
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-[#f0a25c]" />
+                <span className="text-[11px] sm:text-xs text-[#ced0dc] font-semibold whitespace-nowrap">
                   Tutup
                 </span>
               </>
             ) : (
               <>
-                <ChevronLeft className="w-5 h-5 text-[#f0a25c]" />
-                <span className="text-xs text-[#ced0dc] font-semibold whitespace-nowrap">
+                <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 text-[#f0a25c]" />
+                <span className="text-[11px] sm:text-xs text-[#ced0dc] font-semibold whitespace-nowrap">
                   Preview
                 </span>
               </>
@@ -1616,8 +1616,8 @@ export default function BoothPage() {
                     cx="35"
                     cy="35"
                     r="28"
-                    stroke="rgba(240, 162, 92, 0.25)"
-                    strokeWidth="3.5"
+                    stroke="rgba(240, 162, 92, 0.2)"
+                    strokeWidth="3"
                     fill="none"
                   />
                   <circle
@@ -1626,7 +1626,7 @@ export default function BoothPage() {
                     cy="35"
                     r="28"
                     stroke="#f0a25c"
-                    strokeWidth="4"
+                    strokeWidth="3.5"
                     strokeDasharray="176"
                     strokeDashoffset={176}
                     strokeLinecap="round"
@@ -1637,83 +1637,73 @@ export default function BoothPage() {
                 {/* Dwell percentage lock pill */}
                 <div
                   ref={cursorPercentRef}
-                  className="absolute -bottom-6 px-2 py-0.5 rounded-full bg-black/90 border border-[#f0a25c]/50 font-mono-tech text-[9px] font-bold text-[#f0a25c] tracking-wider pointer-events-none shadow-md"
+                  className="absolute -bottom-6 px-2 py-0.5 rounded-full bg-black/80 border border-[#292b3b] font-mono-tech text-[9px] font-bold text-[#f0a25c] tracking-wider pointer-events-none shadow"
                 >
                   0%
                 </div>
               </>
             )}
 
-            {/* Pointer Dot with purely circular radial glow (zero rectangular border artifacts) */}
-            <div className="relative w-6 h-6 rounded-full border-2 border-[#f0a25c] bg-[#10111c] shadow-[0_0_16px_rgba(240,162,92,0.9)] flex items-center justify-center">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#f0a25c] animate-ping opacity-60" />
-              <div className="w-2 h-2 rounded-full bg-white absolute shadow-[0_0_6px_#ffffff]" />
+            {/* Clean minimal pointer dot (No heavy distracting glow) */}
+            <div className="relative w-5 h-5 rounded-full border-2 border-[#f0a25c] bg-[#10111c] shadow-md flex items-center justify-center">
+              <div className="w-1.5 h-1.5 rounded-full bg-white" />
             </div>
           </div>
         </div>
       )}
 
-      {/* ===== REAL-TIME SKELETON GESTURE FEEDBACK HUD (BOTTOM CENTER - ELEVATED) ===== */}
+      {/* ===== REAL-TIME GESTURE FEEDBACK HUD (CLEAN & MINIMALIST) ===== */}
       {cameraReady && step !== "welcome_intro" && step !== "thank_you" && (
         <div className="fixed bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 z-[45] pointer-events-none select-none">
-          <div
-            className={`px-5 py-2 rounded-lg border backdrop-blur-md shadow-2xl flex items-center gap-3 transition-all duration-200 ${!isHandDetected
-              ? "bg-[#10111c]/45 border-[#292b3b] text-[#9b9eaf]"
-              : lastDetectedGesture === "peace"
-                ? "bg-[#246cff]/25 border-[#246cff]/70 text-white shadow-[0_0_25px_rgba(36,108,255,0.5)]"
-                : lastDetectedGesture === "pointing"
-                  ? "bg-[#f0a25c]/20 border-[#f0a25c]/70 text-white shadow-[0_0_20px_rgba(240,162,92,0.4)]"
-                  : lastDetectedGesture === "thumbs_up"
-                    ? "bg-emerald-500/20 border-emerald-500/70 text-white shadow-[0_0_20px_rgba(16,185,129,0.45)]"
-                    : lastDetectedGesture === "thumbs_down"
-                      ? "bg-rose-500/20 border-rose-500/70 text-white shadow-[0_0_20px_rgba(244,63,94,0.45)]"
-                      : lastDetectedGesture === "wave"
-                        ? "bg-[#ff7b00]/20 border-[#ff7b00]/70 text-white shadow-[0_0_20px_rgba(255,123,0,0.4)]"
-                        : "bg-[#10111c]/45 border-[#292b3b] text-white"
-              }`}
-          >
-            <span className="font-mono-tech text-xs tracking-wider uppercase font-bold">
+          <div className="px-4 py-2 rounded-xl border border-[#292b3b] bg-[#10111c]/80 backdrop-blur-md shadow-xl flex items-center gap-2.5 transition-all duration-200">
+            {/* Minimalist Status Dot */}
+            <span
+              className={`w-2 h-2 rounded-full shrink-0 ${isHandDetected ? "bg-emerald-400" : "bg-[#454964]"
+                }`}
+            />
+
+            <span className="font-mono-tech text-xs tracking-wide font-medium text-[#ced0dc]">
               {!isHandDetected ? (
-                <span className="text-[#9b9eaf]">✋ Angkat Tangan</span>
+                <span className="text-[#888b9c]">Angkat Tangan ke Kamera</span>
               ) : lastDetectedGesture === "peace" ? (
                 <span className="text-white flex items-center gap-1.5">
-                  <span className="text-sm">✌️</span>
-                  <span>Gestur: Pose Peace</span>
+                  <span>✌️</span>
+                  <span>Pose Peace</span>
                 </span>
               ) : lastDetectedGesture === "pointing" ? (
                 <span className="text-white flex items-center gap-1.5">
-                  <span className="text-sm">👆</span>
-                  <span>Gestur: Telunjuk</span>
+                  <span>👆</span>
+                  <span>Telunjuk (Kursor)</span>
                 </span>
               ) : lastDetectedGesture === "thumbs_up" ? (
-                <span className="text-emerald-300 flex items-center gap-1.5">
-                  <span className="text-sm">👍</span>
-                  <span>Gestur: Jempol Atas</span>
+                <span className="text-white flex items-center gap-1.5">
+                  <span>👍</span>
+                  <span>Jempol Atas (Lanjut)</span>
                 </span>
               ) : lastDetectedGesture === "thumbs_down" ? (
-                <span className="text-rose-300 flex items-center gap-1.5">
-                  <span className="text-sm">👎</span>
-                  <span>Gestur: Jempol Bawah</span>
+                <span className="text-white flex items-center gap-1.5">
+                  <span>👎</span>
+                  <span>Jempol Bawah (Ulang)</span>
                 </span>
               ) : lastDetectedGesture === "wave" ? (
-                <span className="text-[#f0a25c] flex items-center gap-1.5">
-                  <span className="text-sm">👋</span>
-                  <span>Gestur: Melambaikan Tangan</span>
+                <span className="text-white flex items-center gap-1.5">
+                  <span>👋</span>
+                  <span>Lambaian Tangan</span>
                 </span>
               ) : lastDetectedGesture === "open_palm" ? (
                 <span className="text-white flex items-center gap-1.5">
-                  <span className="text-sm">🖐️</span>
-                  <span>Gestur: Telapak Tangan</span>
+                  <span>🖐️</span>
+                  <span>Telapak Terbuka</span>
                 </span>
               ) : lastDetectedGesture === "fist" ? (
                 <span className="text-white flex items-center gap-1.5">
-                  <span className="text-sm">✊</span>
-                  <span>Gestur: Kepalan Tangan</span>
+                  <span>✊</span>
+                  <span>Kepalan Tangan</span>
                 </span>
               ) : (
-                <span className="text-[#ced0dc] flex items-center gap-1.5">
-                  <span className="text-sm">✋</span>
-                  <span>Gestur: Tangan Terdeteksi</span>
+                <span className="text-white flex items-center gap-1.5">
+                  <span>✋</span>
+                  <span>Tangan Terdeteksi</span>
                 </span>
               )}
             </span>
@@ -2551,7 +2541,7 @@ export default function BoothPage() {
 
                 <div className="mt-6 px-6 py-2.5 rounded-2xl bg-[#10111c]/90 border border-[#292b3b] shadow-2xl">
                   <span className="font-mono-tech text-sm sm:text-base text-[#f0a25c] tracking-widest uppercase font-extrabold">
-                    POSE {currentPoseIndex + 1} DARI {totalPoses} • TAHAN SENYUM & GAYA ANDA!
+                    POSE {currentPoseIndex + 1} DARI {totalPoses}
                   </span>
                 </div>
               </>
@@ -2621,9 +2611,9 @@ export default function BoothPage() {
                     className="max-h-[50vh] object-contain rounded-2xl"
                   />
                   <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-2xl bg-[#090a12]/95 backdrop-blur-md border border-[#292b3b] text-white font-mono-tech text-xs flex items-center gap-3 whitespace-nowrap shadow-2xl">
-                    <span className="text-emerald-400 font-bold">✌️/👍: Lanjut</span>
+                    <span className="text-[#fff] font-bold">✌️/👍: Lanjut</span>
                     <span className="text-[#9b9eaf]">•</span>
-                    <span className="text-rose-400 font-bold">👎: Ulang</span>
+                    <span className="text-[#fff] font-bold">👎: Ulang</span>
                   </div>
                 </div>
               ) : (
@@ -2742,11 +2732,10 @@ export default function BoothPage() {
                           selectedRetakePoseRef.current = idx;
                           setSelectedRetakePose(idx);
                         }}
-                        className={`group relative rounded-2xl p-2 sm:p-2.5 border transition-all duration-200 flex items-center justify-between gap-3 cursor-pointer select-none ${
-                          isSelected
-                            ? "bg-[#1d2035] border-[#f0a25c] ring-2 ring-[#f0a25c]/50 shadow-[0_0_20px_rgba(240,162,92,0.25)] scale-[1.01]"
-                            : "bg-[#151726]/80 border-[#292b3b] hover:border-[#3d4158] hover:bg-[#1a1d2e]"
-                        }`}
+                        className={`group relative rounded-2xl p-2 sm:p-2.5 border transition-all duration-200 flex items-center justify-between gap-3 cursor-pointer select-none ${isSelected
+                          ? "bg-[#1d2035] border-[#f0a25c] ring-2 ring-[#f0a25c]/50 shadow-[0_0_20px_rgba(240,162,92,0.25)] scale-[1.01]"
+                          : "bg-[#151726]/80 border-[#292b3b] hover:border-[#3d4158] hover:bg-[#1a1d2e]"
+                          }`}
                       >
                         {/* Thumbnail + Info */}
                         <div className="flex items-center gap-3">
@@ -2795,11 +2784,10 @@ export default function BoothPage() {
                             e.stopPropagation();
                             handleRetakeSpecificPose(idx);
                           }}
-                          className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 shadow-md ${
-                            isSelected
-                              ? "bg-rose-600 hover:bg-rose-500 text-white shadow-[0_2px_12px_rgba(225,29,72,0.4)]"
-                              : "bg-[#202336] hover:bg-rose-600/80 text-rose-300 hover:text-white"
-                          }`}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 shadow-md ${isSelected
+                            ? "bg-rose-600 hover:bg-rose-500 text-white shadow-[0_2px_12px_rgba(225,29,72,0.4)]"
+                            : "bg-[#202336] hover:bg-rose-600/80 text-rose-300 hover:text-white"
+                            }`}
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
                           <span>Ulang #{idx + 1}</span>

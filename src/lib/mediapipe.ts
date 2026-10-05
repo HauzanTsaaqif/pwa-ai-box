@@ -387,9 +387,9 @@ export function drawHandSkeleton(
     };
   }
 
-  // --- PASS 1: AMBIENT NEON OUTER GLOW (Zero Gaussian Blur Overhead) ---
-  ctx.lineWidth = 5.5;
-  ctx.strokeStyle = "rgba(240, 162, 92, 0.28)";
+// --- PASS 1: CLEAN MINIMAL SKELETON CONNECTIONS (No heavy neon outer glow) ---
+  ctx.lineWidth = 1.8;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.beginPath();
@@ -401,54 +401,30 @@ export function drawHandSkeleton(
   }
   ctx.stroke();
 
-  // --- PASS 2: SOLID CORE BONES ---
-  ctx.lineWidth = 2.2;
-  ctx.strokeStyle = "rgba(255, 230, 205, 0.95)";
-  ctx.beginPath();
-  for (const [start, end] of connections) {
-    const p1 = coords[start];
-    const p2 = coords[end];
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-  }
-  ctx.stroke();
-
-  // --- PASS 3: JOINT NODES & ACTIVE POINTER ---
-  const tips = [4, 8, 12, 16, 20];
+  // --- PASS 2: SUBTLE JOINT NODES & CLEAN ACTIVE POINTER ---
   for (let idx = 0; idx < 21; idx++) {
     const p = coords[idx];
-    const isTip = tips.includes(idx);
 
     if (idx === 8) {
-      // Index finger tip (active cursor pointer): glowing halo ring + bright core
+      // Index finger tip (active cursor pointer): clean minimal dot with subtle accent ring
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 11, 0, 2 * Math.PI);
-      ctx.fillStyle = "rgba(240, 162, 92, 0.35)";
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 5.5, 0, 2 * Math.PI);
+      ctx.arc(p.x, p.y, 4.5, 0, 2 * Math.PI);
       ctx.fillStyle = "#ffffff";
       ctx.fill();
       ctx.lineWidth = 1.5;
       ctx.strokeStyle = "#f0a25c";
       ctx.stroke();
-    } else if (isTip) {
-      // Fingertips: apricot glow + solid node
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 7, 0, 2 * Math.PI);
-      ctx.fillStyle = "rgba(240, 162, 92, 0.3)";
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 4, 0, 2 * Math.PI);
-      ctx.fillStyle = "#f0a25c";
-      ctx.fill();
-    } else {
-      // Knuckles and joints
+    } else if (idx === 4 || idx === 12 || idx === 16 || idx === 20) {
+      // Other fingertips: small clean neutral node
       ctx.beginPath();
       ctx.arc(p.x, p.y, 2.8, 0, 2 * Math.PI);
-      ctx.fillStyle = "rgba(247, 247, 251, 0.85)";
+      ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+      ctx.fill();
+    } else {
+      // Knuckles and joints: subtle minimal node
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 2, 0, 2 * Math.PI);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
       ctx.fill();
     }
   }
