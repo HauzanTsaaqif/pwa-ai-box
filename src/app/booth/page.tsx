@@ -237,7 +237,7 @@ export default function BoothPage() {
       const bar = target.querySelector(".dwell-bar") as HTMLElement | null;
       if (bar) bar.style.width = `${pct}%`;
       const label = target.querySelector(".dwell-label") as HTMLElement | null;
-      if (label) label.textContent = `Mengunci (${pct}%)...`;
+      if (label) label.textContent = "Memilih...";
     }
   };
 
@@ -1978,27 +1978,25 @@ export default function BoothPage() {
             exit={{ opacity: 0, scale: 0.96 }}
             className="absolute inset-0 z-30 bg-[#090a12]/80 backdrop-blur-md flex flex-col items-center justify-between p-6 sm:p-10 text-center"
           >
-            {/* Top Center Header with Back Button (Ergonomic, Direct Center Below Title, Vertically Lowered) */}
-            <div className="flex flex-col items-center text-center mt-6 sm:mt-10 mb-4 sm:mb-6">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#ff7b00]/10 border border-[#ff7b00]/25 text-[#f0a25c] font-mono-tech text-xs tracking-wider uppercase font-semibold mb-2">
-                <span>Langkah 1 Dari 3</span>
-              </div>
-              <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-                Pilih Paket Foto Studio
-              </h2>
-              <p className="text-[#ced0dc] text-sm sm:text-base mt-1.5">
-                Arahkan telunjuk ke paket pilihan
-              </p>
-
-              {/* Ergonomic Top-Center Back Button */}
+            {/* Top Navigation Bar with Back Button */}
+            <div className="w-full max-w-5xl flex items-center justify-between pt-4 sm:pt-6 mb-2">
               <button
                 data-dwell-id="btn-back-tutorial"
                 onClick={() => setStep("gesture_tutorial")}
-                className="mt-7 px-6 py-2.5 rounded-xl bg-[#171927]/90 hover:bg-[#202336] text-[#ced0dc] hover:text-white border border-[#292b3b] font-medium text-xs sm:text-sm inline-flex items-center gap-2 shadow-lg transition-all cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[#171927]/90 hover:bg-[#202336] text-[#ced0dc] hover:text-white border border-[#292b3b] text-xs font-semibold inline-flex items-center gap-2 shadow-sm transition-all cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4 text-[#f0a25c]" />
-                <span>Kembali Latihan Sensor</span>
+                <span>Kembali</span>
               </button>
+
+              <div className="text-center flex-1 pr-14 sm:pr-20">
+                <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
+                  Pilih Paket Foto Studio
+                </h2>
+                <p className="text-[#9b9eaf] text-xs sm:text-sm mt-0.5">
+                  Arahkan kursor telunjuk ke paket pilihan
+                </p>
+              </div>
             </div>
 
             {/* 3 Package Cards */}
@@ -2075,7 +2073,7 @@ export default function BoothPage() {
                         {isLocked
                           ? "✓ Paket Dipilih!"
                           : isHovered
-                            ? <span className="dwell-label">Mengunci (0%)...</span>
+                            ? <span className="dwell-label">Memilih...</span>
                             : "Pilih Paket"}
                       </div>
                     </div>
@@ -2102,27 +2100,25 @@ export default function BoothPage() {
             exit={{ opacity: 0, scale: 0.96 }}
             className="absolute inset-0 z-30 bg-[#090a12]/80 backdrop-blur-md flex flex-col items-center justify-between p-6 sm:p-10 text-center"
           >
-            {/* Top Center Header with Back Button (Ergonomic, Direct Center Below Title, Vertically Lowered) */}
-            <div className="flex flex-col items-center text-center mt-6 sm:mt-10 mb-4 sm:mb-6">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#246cff]/10 border border-[#246cff]/25 text-[#246cff] font-mono-tech text-xs tracking-wider uppercase font-semibold mb-2">
-                <span>Langkah 2 Dari 3</span>
-              </div>
-              <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-                Pilih Ukuran Format Foto
-              </h2>
-              <p className="text-[#ced0dc] text-sm sm:text-base mt-1.5">
-                Arahkan telunjuk ke ukuran cetak pilihan
-              </p>
-
-              {/* Ergonomic Top-Center Back Button */}
+            {/* Top Navigation Bar with Back Button */}
+            <div className="w-full max-w-4xl flex items-center justify-between pt-4 sm:pt-6 mb-2">
               <button
                 data-dwell-id="btn-back-package"
                 onClick={() => setStep("select_package")}
-                className="mt-7 px-6 py-2.5 rounded-xl bg-[#171927]/90 hover:bg-[#202336] text-[#ced0dc] hover:text-white border border-[#292b3b] font-medium text-xs sm:text-sm inline-flex items-center gap-2 shadow-lg transition-all cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[#171927]/90 hover:bg-[#202336] text-[#ced0dc] hover:text-white border border-[#292b3b] text-xs font-semibold inline-flex items-center gap-2 shadow-sm transition-all cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4 text-[#f0a25c]" />
-                <span>Kembali ke Pilih Paket</span>
+                <span>Kembali</span>
               </button>
+
+              <div className="text-center flex-1 pr-14 sm:pr-20">
+                <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
+                  Pilih Ukuran Format Foto
+                </h2>
+                <p className="text-[#9b9eaf] text-xs sm:text-sm mt-0.5">
+                  Arahkan kursor telunjuk ke ukuran cetak pilihan
+                </p>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl w-full my-auto">
@@ -2194,7 +2190,7 @@ export default function BoothPage() {
                         {isLocked
                           ? "✓ Format Dipilih!"
                           : isHovered
-                            ? <span className="dwell-label">Mengunci (0%)...</span>
+                            ? <span className="dwell-label">Memilih...</span>
                             : "Pilih Format"}
                       </div>
                     </div>
@@ -2221,27 +2217,25 @@ export default function BoothPage() {
             exit={{ opacity: 0, scale: 0.96 }}
             className="absolute inset-0 z-30 bg-[#090a12]/80 backdrop-blur-md flex flex-col items-center justify-between p-6 sm:p-10 text-center"
           >
-            {/* Top Center Header with Back Button (Ergonomic, Direct Center Below Title, Vertically Lowered) */}
-            <div className="flex flex-col items-center text-center mt-6 sm:mt-10 mb-4 sm:mb-6">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#ff7b00]/10 border border-[#ff7b00]/25 text-[#f0a25c] font-mono-tech text-xs tracking-wider uppercase font-semibold mb-2">
-                <span>Langkah 3 Dari 3</span>
-              </div>
-              <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-                Pilih Bingkai Foto
-              </h2>
-              <p className="text-[#ced0dc] text-sm sm:text-base mt-1.5">
-                Arahkan telunjuk ke desain bingkai favorit Anda
-              </p>
-
-              {/* Ergonomic Top-Center Back Button */}
+            {/* Top Navigation Bar with Back Button */}
+            <div className="w-full max-w-5xl flex items-center justify-between pt-4 sm:pt-6 mb-2">
               <button
                 data-dwell-id="btn-back-format"
                 onClick={() => setStep("select_format")}
-                className="mt-7 px-6 py-2.5 rounded-xl bg-[#171927]/90 hover:bg-[#202336] text-[#ced0dc] hover:text-white border border-[#292b3b] font-medium text-xs sm:text-sm inline-flex items-center gap-2 shadow-lg transition-all cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[#171927]/90 hover:bg-[#202336] text-[#ced0dc] hover:text-white border border-[#292b3b] text-xs font-semibold inline-flex items-center gap-2 shadow-sm transition-all cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4 text-[#f0a25c]" />
-                <span>Kembali Pilih Format</span>
+                <span>Kembali</span>
               </button>
+
+              <div className="text-center flex-1 pr-14 sm:pr-20">
+                <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
+                  Pilih Bingkai Foto
+                </h2>
+                <p className="text-[#9b9eaf] text-xs sm:text-sm mt-0.5">
+                  Arahkan kursor telunjuk ke desain bingkai favorit Anda
+                </p>
+              </div>
             </div>
 
             {/* Template Cards Grid filtered by selectedFormat */}
@@ -2345,7 +2339,7 @@ export default function BoothPage() {
                               {isLocked
                                 ? "✓ Bingkai Dipilih!"
                                 : isHovered
-                                  ? <span className="dwell-label">Mengunci (0%)...</span>
+                                  ? <span className="dwell-label">Memilih...</span>
                                   : "Pilih Bingkai"}
                             </div>
                           </div>
@@ -2391,9 +2385,6 @@ export default function BoothPage() {
             className="absolute inset-0 z-40 bg-[#090a12]/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center"
           >
             <div className="w-full max-w-md flex flex-col items-center justify-center mb-3">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#246cff]/10 border border-[#246cff]/25 text-[#246cff] font-mono-tech text-xs tracking-wider uppercase font-semibold mb-2">
-                <span>Konfirmasi Pembayaran</span>
-              </div>
               <button
                 data-dwell-id="btn-back-theme"
                 onClick={() => setStep("select_theme")}
@@ -2462,45 +2453,51 @@ export default function BoothPage() {
       {/* ========================================================================= */}
       {/* ===== STEP 7: POSE READY (STANDBY - WAITING FOR PEACE GESTURE / BUTTON) = */}
       {/* ========================================================================= */}
+      {/* ========================================================================= */}
+      {/* ===== STEP 7: POSE READY (CLEAN CAMERA VIEW - NON-OBSTRUCTIVE) ========== */}
+      {/* ========================================================================= */}
       <AnimatePresence>
         {step === "pose_ready" && (
           <motion.div
             key="pose_ready"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="absolute inset-0 z-30 flex flex-col items-center justify-between p-6 sm:p-10 text-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-30 flex flex-col items-center justify-between p-6 sm:p-10 pointer-events-none select-none"
           >
-            {/* Top Indicator */}
-            <div className="mt-4 px-6 py-2 rounded-2xl bg-[#10111c]/90 backdrop-blur-md border border-[#292b3b] shadow-xl flex items-center gap-3">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#f0a25c] animate-ping" />
-              <span className="font-mono-tech text-sm sm:text-base text-[#f0a25c] uppercase font-extrabold tracking-widest">
-                FOTO {currentPoseIndex + 1} DARI {totalPoses} • {selectedTheme?.name || "Bingkai Pilihan"}
+            {/* Top Indicator Pill */}
+            <div className="mt-2 px-5 py-2 rounded-full bg-[#10111c]/80 backdrop-blur-md border border-[#292b3b] shadow-lg flex items-center gap-2.5 pointer-events-auto">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span className="font-mono-tech text-xs sm:text-sm text-white font-bold tracking-wider uppercase">
+                Foto {currentPoseIndex + 1} dari {totalPoses}
+              </span>
+              <span className="text-[#686b7f]">•</span>
+              <span className="text-xs sm:text-sm text-[#f0a25c] font-medium">
+                {selectedTheme?.name || "Bingkai Pilihan"}
               </span>
             </div>
 
-            {/* Center Call-to-Action Card */}
-            <div className="max-w-md bg-[#10111c]/60 backdrop-blur-md p-6 sm:p-8 rounded-3xl border border-[#292b3b] shadow-2xl">
-              <h2 className="text-3xl sm:text-4xl font-black text-white mb-2 tracking-tight">
-                Pose Ke-{currentPoseIndex + 1}
-              </h2>
+            {/* Center Area is Kept 100% COMPLETELY CLEAR for Camera Subject */}
+            <div className="flex-1" />
 
-              <p className="text-[#ced0dc] text-sm leading-relaxed mb-5 max-w-sm mx-auto">
-                Tunjukkan gaya <strong className="text-[#f0a25c]">Peace ✌️</strong> ke kamera untuk mulai hitung mundur 5 detik.
-              </p>
+            {/* Bottom Elegant Floating Action Bar */}
+            <div className="mb-20 sm:mb-24 flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-[#10111c]/85 backdrop-blur-md border border-[#292b3b] shadow-2xl pointer-events-auto">
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-[#ced0dc]">
+                <span className="text-base">✌️</span>
+                <span>Pose <strong className="text-white">Peace</strong> untuk mulai</span>
+              </div>
+
+              <div className="w-px h-4 bg-[#292b3b]" />
 
               <button
                 data-dwell-id="btn-start-countdown-manual"
                 onClick={() => setStep("countdown")}
-                className="w-full py-3.5 sm:py-4 bg-[#246cff] hover:bg-[#4d87ff] text-white rounded-2xl font-bold text-sm uppercase tracking-wider shadow-[0_6px_25px_rgba(36,108,255,0.4)] transition-all inline-flex items-center justify-center gap-2.5"
+                className="px-4 py-1.5 bg-[#246cff] hover:bg-[#3d7eff] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95"
               >
-                <Camera className="w-4 h-4 shrink-0" />
+                <Camera className="w-3.5 h-3.5" />
                 <span>Mulai</span>
               </button>
             </div>
-
-            {/* Spacer */}
-            <div className="h-4" />
           </motion.div>
         )}
       </AnimatePresence>
@@ -2515,126 +2512,105 @@ export default function BoothPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-40 flex flex-col items-center justify-center"
+            className="absolute inset-0 z-40 flex flex-col items-center justify-center pointer-events-none select-none"
           >
             {isCompositingPreview ? (
               <div className="flex flex-col items-center gap-4 bg-[#10111c]/90 px-8 py-6 rounded-2xl border border-[#292b3b] backdrop-blur-md shadow-2xl">
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  className="w-12 h-12 border-4 border-[#f0a25c] border-t-transparent rounded-full"
+                  className="w-10 h-10 border-3 border-[#f0a25c] border-t-transparent rounded-full"
                 />
-                <span className="text-white font-bold text-lg">Menyusun Foto ke Dalam Bingkai...</span>
+                <span className="text-white font-medium text-sm">Menyusun Foto ke Bingkai...</span>
               </div>
             ) : (
-              <>
-                <motion.div
-                  key={photoCountdown}
-                  initial={{ scale: 1.6, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.5, opacity: 0 }}
-                  transition={{ duration: 0.45, ease: "easeOut" }}
-                  className="text-9xl sm:text-[12rem] font-black text-white font-mono-tech drop-shadow-[0_0_60px_rgba(240,162,92,0.8)]"
-                >
-                  {photoCountdown > 0 ? photoCountdown : "SMILE!"}
-                </motion.div>
-
-                <div className="mt-6 px-6 py-2.5 rounded-2xl bg-[#10111c]/90 border border-[#292b3b] shadow-2xl">
-                  <span className="font-mono-tech text-sm sm:text-base text-[#f0a25c] tracking-widest uppercase font-extrabold">
-                    POSE {currentPoseIndex + 1} DARI {totalPoses}
-                  </span>
-                </div>
-              </>
+              <motion.div
+                key={photoCountdown}
+                initial={{ scale: 1.4, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.7, opacity: 0 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className="text-8xl sm:text-[11rem] font-black text-white font-mono-tech drop-shadow-[0_4px_30px_rgba(0,0,0,0.8)]"
+              >
+                {photoCountdown > 0 ? photoCountdown : "SMILE!"}
+              </motion.div>
             )}
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* ========================================================================= */}
-      {/* ===== STEP 8B: REVIEW FOTO PER JEPRETAN (BISA FOTO ULANG ATAU LANJUT) === */}
+      {/* ===== STEP 8B: REVIEW FOTO PER JEPRETAN (CLEAN & ELEGANT) =============== */}
       {/* ========================================================================= */}
       <AnimatePresence>
         {step === "photo_review_single" && (
           <motion.div
             key="photo_review_single"
-            initial={{ opacity: 0, scale: 0.96 }}
+            initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.96 }}
+            exit={{ opacity: 0, scale: 0.98 }}
             className="absolute inset-0 z-30 bg-[#090a12]/85 backdrop-blur-md flex flex-col items-center justify-between p-6 sm:p-8 text-center"
           >
-            {/* Top Ergonomic Navigation Bar (Vertically Lowered for Comfort) */}
-            <div className="w-full max-w-4xl flex items-center justify-between gap-3 pt-6 sm:pt-10">
+            {/* Top Ergonomic Navigation Bar */}
+            <div className="w-full max-w-4xl flex items-center justify-between gap-3 pt-4 sm:pt-6">
               <button
                 data-dwell-id="btn-retake-single-pose"
                 onClick={handleRetakeCurrentPose}
-                className="px-6 py-3.5 bg-[#171927]/95 hover:bg-rose-600 text-white rounded-2xl border border-[#292b3b] hover:border-rose-500 font-bold text-xs sm:text-sm tracking-wider uppercase transition-all flex items-center gap-2.5 shadow-xl group cursor-pointer active:scale-95"
+                className="px-5 py-3 bg-[#171927]/90 hover:bg-rose-600/90 text-white rounded-2xl border border-[#292b3b] hover:border-rose-500 text-xs sm:text-sm font-semibold tracking-wide transition-all flex items-center gap-2 shadow-lg cursor-pointer active:scale-95"
               >
-                <RotateCcw className="w-5 h-5 text-rose-400 group-hover:rotate-180 transition-transform duration-300" />
-                <div className="text-left">
-                  <div className="font-bold flex items-center gap-1.5">
-                    <span>Foto Ulang</span>
-                  </div>
-                </div>
+                <RotateCcw className="w-4 h-4 text-rose-400" />
+                <span>Foto Ulang (👎)</span>
               </button>
 
-              <div className="px-5 py-2.5 rounded-2xl bg-[#10111c]/90 border border-[#292b3b] text-center hidden sm:block shadow-lg">
-                <span className="font-mono-tech text-xs sm:text-sm text-[#f0a25c] uppercase font-extrabold tracking-widest block">
-                  Foto {currentPoseIndex + 1} Dari {totalPoses}
+              <div className="px-4 py-2 rounded-xl bg-[#10111c]/90 border border-[#292b3b] text-center hidden sm:block shadow-md">
+                <span className="font-mono-tech text-xs text-[#ced0dc] uppercase font-bold tracking-wider">
+                  Foto {currentPoseIndex + 1} dari {totalPoses}
                 </span>
               </div>
 
               <button
                 data-dwell-id="btn-accept-next-pose"
                 onClick={handleAcceptAndNextPose}
-                className="px-8 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl font-bold text-xs sm:text-sm tracking-wider uppercase transition-all flex items-center gap-2.5 shadow-[0_4px_20px_rgba(16,185,129,0.4)] cursor-pointer active:scale-95"
+                className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl text-xs sm:text-sm font-semibold tracking-wide transition-all flex items-center gap-2 shadow-lg cursor-pointer active:scale-95"
               >
-                <Check className="w-5 h-5" />
-                <div className="text-left">
-                  <div className="font-bold flex items-center gap-1.5">
-                    <span>
-                      {currentPoseIndex + 1 < totalPoses
-                        ? `Lanjut Foto`
-                        : "Selesai"}
-                    </span>
-                  </div>
-                </div>
+                <Check className="w-4 h-4" />
+                <span>
+                  {currentPoseIndex + 1 < totalPoses ? "Lanjut Foto (👍)" : "Selesai (👍)"}
+                </span>
               </button>
             </div>
 
-            {/* Center Snapshot Preview Spotlight */}
-            <div className="my-auto flex flex-col items-center justify-center max-h-[58vh]">
+            {/* Center Snapshot Preview (100% Clean Image, No Obstructing Overlay Badge) */}
+            <div className="my-auto flex flex-col items-center justify-center max-h-[64vh]">
               {capturedPhotos[currentPoseIndex] ? (
-                <div className="relative rounded-3xl overflow-hidden border-2 border-[#f0a25c]/50 shadow-[0_12px_45px_rgba(0,0,0,0.85)] bg-[#10111c] max-h-[52vh] p-1.5 flex items-center justify-center">
+                <div className="relative rounded-3xl overflow-hidden border border-[#292b3b] shadow-2xl bg-[#10111c] max-h-[60vh] p-1.5 flex items-center justify-center">
                   <img
                     src={capturedPhotos[currentPoseIndex]}
                     alt={`Hasil Foto ${currentPoseIndex + 1}`}
-                    className="max-h-[50vh] object-contain rounded-2xl"
+                    className="max-h-[58vh] object-contain rounded-2xl"
                   />
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-2xl bg-[#090a12]/95 backdrop-blur-md border border-[#292b3b] text-white font-mono-tech text-xs flex items-center gap-3 whitespace-nowrap shadow-2xl">
-                    <span className="text-[#fff] font-bold">✌️/👍: Lanjut</span>
-                    <span className="text-[#9b9eaf]">•</span>
-                    <span className="text-[#fff] font-bold">👎: Ulang</span>
-                  </div>
                 </div>
               ) : (
-                <div className="p-8 text-[#9b9eaf]">Memuat pratinjau foto...</div>
+                <div className="p-8 text-[#9b9eaf] text-sm">Memuat pratinjau foto...</div>
               )}
             </div>
 
+            {/* Subtle Bottom Spacer */}
+            <div className="h-2" />
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* ========================================================================= */}
-      {/* ===== STEP 9: PREVIEW LENGKAP HASIL PHOTOSTRIP (SEBELUM CETAK) ========== */}
+      {/* ===== STEP 9: PREVIEW LENGKAP HASIL PHOTOSTRIP (CLEAN & MINIMAL) ======== */}
       {/* ========================================================================= */}
       <AnimatePresence>
         {step === "preview_retake" && (
           <motion.div
             key="preview_retake"
-            initial={{ opacity: 0, scale: 0.95 }}
+            initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
+            exit={{ opacity: 0, scale: 0.98 }}
             className="absolute inset-0 z-30 bg-[#090a12]/85 backdrop-blur-md flex flex-col items-center justify-between p-6 sm:p-8 text-center"
           >
             {/* Top Action Bar */}
@@ -2642,28 +2618,25 @@ export default function BoothPage() {
               <button
                 data-dwell-id="btn-retake-all-poses"
                 onClick={handleRetake}
-                className="px-5 py-3 bg-[#171927]/90 hover:bg-[#202336] text-white rounded-2xl border border-[#292b3b] font-bold text-xs sm:text-sm tracking-wider uppercase transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95 shrink-0"
+                className="px-5 py-2.5 bg-[#171927]/90 hover:bg-[#202336] text-white rounded-xl border border-[#292b3b] text-xs sm:text-sm font-semibold tracking-wide transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95 shrink-0"
               >
                 <RotateCcw className="w-4 h-4 text-rose-400 shrink-0" />
                 <span>Foto Ulang Semua</span>
               </button>
 
               <div className="px-2">
-                <h2 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight">
-                  Pratinjau Hasil Akhir
+                <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
+                  Pratinjau Hasil Cetak
                 </h2>
-                <p className="text-[#9b9eaf] text-xs sm:text-sm mt-0.5">
-                  Arahkan kursor ke foto untuk memilih • Beri gestur 👎 jempol bawah untuk ulang
-                </p>
               </div>
 
               <button
                 data-dwell-id="btn-confirm-print"
                 onClick={handleConfirmPreview}
-                className="px-6 sm:px-8 py-3 bg-[#246cff] hover:bg-[#4d87ff] text-white rounded-2xl font-bold text-xs sm:text-sm tracking-wider uppercase transition-all flex items-center justify-center gap-2 shadow-[0_4px_25px_rgba(36,108,255,0.4)] whitespace-nowrap shrink-0"
+                className="px-6 py-2.5 bg-[#246cff] hover:bg-[#3d7eff] text-white rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all flex items-center justify-center gap-2 shadow-lg whitespace-nowrap shrink-0 active:scale-95"
               >
                 <Check className="w-4 h-4 shrink-0" />
-                <span>Lanjut Cetak</span>
+                <span>Lanjut Cetak (👍)</span>
               </button>
             </div>
 
@@ -2671,51 +2644,44 @@ export default function BoothPage() {
             <div className="my-auto flex flex-col md:flex-row items-center justify-center gap-6 lg:gap-10 w-full max-w-5xl px-4 py-2">
               {/* KIRI: Pratinjau Photostrip Lengkap (Frame + Foto) */}
               <div className="flex flex-col items-center justify-center shrink-0">
-                <div className="relative rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.9)] border-2 border-[#292b3b] bg-[#10111c]/90 p-2.5 max-h-[56vh] flex items-center justify-center">
+                <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-[#292b3b] bg-[#10111c]/90 p-2 max-h-[58vh] flex items-center justify-center">
                   {previewStripUrl || photostripBase64Ref.current ? (
                     <img
                       src={previewStripUrl || photostripBase64Ref.current}
                       alt="Hasil Foto dan Frame"
-                      className="max-h-[50vh] object-contain rounded-2xl shadow-xl"
+                      className="max-h-[54vh] object-contain rounded-xl shadow-lg"
                     />
                   ) : (
                     <div className="flex flex-col items-center gap-3 p-10">
                       <motion.div
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-10 h-10 border-3 border-[#f0a25c] border-t-transparent rounded-full"
+                        className="w-8 h-8 border-2 border-[#f0a25c] border-t-transparent rounded-full"
                       />
-                      <span className="text-white text-sm">Menyusun strip foto...</span>
+                      <span className="text-white text-xs">Menyusun strip foto...</span>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* KANAN: Daftar Vertikal Foto untuk Dipilih & Diulang */}
-              <div className="flex flex-col w-full max-w-md bg-[#10111c]/95 border border-[#292b3b] rounded-3xl p-4 sm:p-5 shadow-2xl backdrop-blur-md">
-                <div className="flex items-center justify-between pb-3 border-b border-[#292b3b]/80 mb-3">
-                  <div className="flex items-center gap-2.5 text-left">
-                    <div className="w-8 h-8 rounded-xl bg-[#f0a25c]/15 text-[#f0a25c] flex items-center justify-center shrink-0">
-                      <RotateCcw className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm sm:text-base font-bold text-white tracking-wide">
-                        Pilih Foto yang Ingin Diulang
-                      </h3>
-                      <p className="text-[11px] text-[#9b9eaf]">
-                        Arahkan kursor untuk memilih, beri gestur 👎 untuk ulang
-                      </p>
-                    </div>
+              <div className="flex flex-col w-full max-w-md bg-[#10111c]/95 border border-[#292b3b] rounded-2xl p-4 sm:p-5 shadow-xl backdrop-blur-md">
+                <div className="flex items-center justify-between pb-3 border-b border-[#292b3b] mb-3">
+                  <div className="flex items-center gap-2 text-left">
+                    <RotateCcw className="w-4 h-4 text-[#f0a25c]" />
+                    <h3 className="text-sm sm:text-base font-bold text-white tracking-wide">
+                      Pilih Foto untuk Diulang
+                    </h3>
                   </div>
                   {selectedRetakePose !== null && (
-                    <div className="px-2.5 py-1 rounded-full bg-[#f0a25c]/20 border border-[#f0a25c]/40 text-[#f0a25c] text-xs font-mono-tech font-bold shrink-0 animate-pulse">
+                    <div className="px-2.5 py-0.5 rounded-full bg-[#f0a25c]/15 border border-[#f0a25c]/30 text-[#f0a25c] text-xs font-mono-tech font-bold shrink-0">
                       Foto #{selectedRetakePose + 1}
                     </div>
                   )}
                 </div>
 
                 {/* Vertical List of Photo Cards */}
-                <div className="flex flex-col gap-2.5 max-h-[44vh] overflow-y-auto pr-1">
+                <div className="flex flex-col gap-2 max-h-[44vh] overflow-y-auto pr-1">
                   {Array.from({ length: totalPoses }).map((_, idx) => {
                     const photo = capturedPhotos[idx];
                     const isSelected = selectedRetakePose === idx;
@@ -2732,14 +2698,14 @@ export default function BoothPage() {
                           selectedRetakePoseRef.current = idx;
                           setSelectedRetakePose(idx);
                         }}
-                        className={`group relative rounded-2xl p-2 sm:p-2.5 border transition-all duration-200 flex items-center justify-between gap-3 cursor-pointer select-none ${isSelected
-                          ? "bg-[#1d2035] border-[#f0a25c] ring-2 ring-[#f0a25c]/50 shadow-[0_0_20px_rgba(240,162,92,0.25)] scale-[1.01]"
-                          : "bg-[#151726]/80 border-[#292b3b] hover:border-[#3d4158] hover:bg-[#1a1d2e]"
+                        className={`group relative rounded-xl p-2 border transition-all duration-150 flex items-center justify-between gap-3 cursor-pointer select-none ${isSelected
+                          ? "bg-[#1d2035] border-[#f0a25c] ring-1 ring-[#f0a25c]/40 shadow-md"
+                          : "bg-[#151726]/70 border-[#292b3b] hover:border-[#3d4158] hover:bg-[#1a1d2e]"
                           }`}
                       >
-                        {/* Thumbnail + Info */}
+                        {/* Thumbnail + Label */}
                         <div className="flex items-center gap-3">
-                          <div className="relative w-14 h-12 sm:w-16 sm:h-14 rounded-xl overflow-hidden bg-black/70 border border-[#292b3b] shrink-0">
+                          <div className="relative w-14 h-12 rounded-lg overflow-hidden bg-black/70 border border-[#292b3b] shrink-0">
                             {photo ? (
                               <img
                                 src={photo}
@@ -2751,31 +2717,19 @@ export default function BoothPage() {
                                 Kosong
                               </div>
                             )}
-                            <div className="absolute top-0.5 left-0.5 px-1.5 py-0.5 rounded-md bg-black/85 font-mono-tech text-[10px] text-white font-bold">
+                            <div className="absolute top-0.5 left-0.5 px-1 py-0.2 rounded bg-black/85 font-mono-tech text-[9px] text-white font-bold">
                               #{idx + 1}
                             </div>
                           </div>
 
                           <div className="text-left">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs sm:text-sm font-bold text-white">
-                                Foto Pose #{idx + 1}
-                              </span>
-                              {isSelected && (
-                                <span className="text-[9px] font-mono-tech px-1.5 py-0.5 rounded bg-[#f0a25c] text-black font-extrabold uppercase">
-                                  Terpilih
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-[#9b9eaf] mt-0.5">
-                              {isSelected
-                                ? "Tahan 👎 jempol bawah untuk ulang"
-                                : "Arahkan kursor ke sini untuk pilih"}
-                            </p>
+                            <span className="text-xs sm:text-sm font-semibold text-white">
+                              Foto #{idx + 1}
+                            </span>
                           </div>
                         </div>
 
-                        {/* Direct Button */}
+                        {/* Direct Retake Button */}
                         <button
                           type="button"
                           data-dwell-id={`btn-retake-pose-${idx}`}
@@ -2784,33 +2738,30 @@ export default function BoothPage() {
                             e.stopPropagation();
                             handleRetakeSpecificPose(idx);
                           }}
-                          className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 shadow-md ${isSelected
-                            ? "bg-rose-600 hover:bg-rose-500 text-white shadow-[0_2px_12px_rgba(225,29,72,0.4)]"
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 ${isSelected
+                            ? "bg-rose-600 hover:bg-rose-500 text-white shadow"
                             : "bg-[#202336] hover:bg-rose-600/80 text-rose-300 hover:text-white"
                             }`}
                         >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          <span>Ulang #{idx + 1}</span>
+                          <RotateCcw className="w-3 h-3" />
+                          <span>Ulang</span>
                         </button>
                       </div>
                     );
                   })}
                 </div>
 
-                {/* Gesture Helper Pills */}
-                <div className="mt-3 pt-3 border-t border-[#292b3b]/70 flex items-center justify-between text-xs text-[#ced0dc]">
-                  <div className="flex items-center gap-1.5 text-left">
-                    <span className="text-sm">👎</span>
-                    <span className="text-[11px]">
-                      Jempol Bawah: <strong className="text-rose-400">Ulang Terpilih</strong>
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-right">
-                    <span className="text-sm">👍</span>
-                    <span className="text-[11px]">
-                      Jempol Atas: <strong className="text-emerald-400">Lanjut Cetak</strong>
-                    </span>
-                  </div>
+                {/* Streamlined Gesture Helper Pills */}
+                <div className="mt-3 pt-3 border-t border-[#292b3b] flex items-center justify-around text-xs text-[#9b9eaf]">
+                  <span className="flex items-center gap-1">
+                    <span>👎</span>
+                    <span>Jempol Bawah: <strong className="text-rose-300">Ulang</strong></span>
+                  </span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1">
+                    <span>👍</span>
+                    <span>Jempol Atas: <strong className="text-emerald-300">Lanjut</strong></span>
+                  </span>
                 </div>
               </div>
             </div>
