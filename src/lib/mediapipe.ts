@@ -217,30 +217,36 @@ export class MediaPipeManager {
       return distTipToMcp < 0.14 || !fingersExtended[idx + 1];
     });
 
-    const thumbExtendedFromMcp = Math.hypot(
-      landmarks[4].x - landmarks[2].x,
-      landmarks[4].y - landmarks[2].y
-    ) > 0.06;
+    // ---- Jempol vs kepalan ----
+    // Kepalan menghadap atas/bawah juga membuat ujung jempol berada "di atas/bawah" sendi lain, jadi arah
+    // saja tidak cukup. Jempol benar-benar teracung bila: (1) ujungnya jauh melewati buku jari (diukur
+    // relatif ukuran telapak agar tidak tergantung jarak ke kamera), (2) lurus (tidak menekuk di sendi IP),
+    // dan (3) menjauh dari jari telunjuk — pada kepalan jempol terlipat menempel ke jari.
+    const d = (i: number, j: number) =>
+      Math.hypot(landmarks[i].x - landmarks[j].x, landmarks[i].y - landmarks[j].y);
+    const handScale = Math.max(d(0, 9), d(5, 17), 0.01);
 
-    // THUMBS DOWN (👎 Dislike / Retake): Thumb pointing DOWN, all other 4 fingers folded
-    if (
-      mainFingersCurled &&
-      thumbExtendedFromMcp &&
-      landmarks[4].y > landmarks[3].y &&
-      landmarks[4].y > landmarks[2].y &&
-      landmarks[4].y > Math.min(landmarks[0].y, landmarks[5].y)
-    ) {
+    const thumbAwayFromFingers = d(4, 6) / handScale > 0.55 && d(4, 5) / handScale > 0.6;
+
+    // Kelurusan jempol: cos sudut antara ruas MCP→IP dan IP→tip (1 = lurus)
+    const v1x = landmarks[3].x - landmarks[2].x, v1y = landmarks[3].y - landmarks[2].y;
+    const v2x = landmarks[4].x - landmarks[3].x, v2y = landmarks[4].y - landmarks[3].y;
+    const thumbStraight =
+      (v1x * v2x + v1y * v2y) / (Math.hypot(v1x, v1y) * Math.hypot(v2x, v2y) + 1e-6) > 0.75;
+
+    const knuckleYs = [5, 9, 13, 17].map((i) => landmarks[i].y);
+    const upMargin = (Math.min(...knuckleYs) - landmarks[4].y) / handScale;   // + = ujung jempol di atas buku jari
+    const downMargin = (landmarks[4].y - Math.max(...knuckleYs)) / handScale; // + = ujung jempol di bawah buku jari
+
+    const thumbExtendedFromMcp = thumbAwayFromFingers && thumbStraight;
+
+    // THUMBS DOWN (👎 Dislike / Retake): jempol lurus menunjuk ke bawah, 4 jari lain terlipat
+    if (mainFingersCurled && thumbExtendedFromMcp && downMargin > 0.4) {
       return "thumbs_down";
     }
 
-    // THUMBS UP (👍 Like / Continue): Thumb pointing UP, all other 4 fingers folded
-    if (
-      mainFingersCurled &&
-      thumbExtendedFromMcp &&
-      landmarks[4].y < landmarks[3].y &&
-      landmarks[4].y < landmarks[2].y &&
-      landmarks[4].y < Math.max(landmarks[0].y, landmarks[5].y)
-    ) {
+    // THUMBS UP (👍 Like / Continue): jempol lurus menunjuk ke atas, 4 jari lain terlipat
+    if (mainFingersCurled && thumbExtendedFromMcp && upMargin > 0.4) {
       return "thumbs_up";
     }
 
@@ -249,7 +255,8 @@ export class MediaPipeManager {
     if (extendedCount >= 4) return "open_palm";
 
     // FIST: all fingers curled
-    if (mainFingersCurled && !thumbExtendedFromMcp) return "fist";
+    // (jempol terlipat/menyamping/tidak lurus-ke-atas-bawah tetap dihitung kepalan, apa pun arah kepalannya)
+    if (mainFingersCurled) return "fist";
 
     // PEACE: index + middle extended only
     if (
