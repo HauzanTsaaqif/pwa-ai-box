@@ -68,7 +68,18 @@ export default function LandingPage() {
             </div>
           </Link>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <Link href="/sandbox/fal-ai">
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                className="px-4 py-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 border border-purple-300 rounded-full text-xs sm:text-sm font-semibold transition-all flex items-center gap-2"
+              >
+                <Sparkles className="w-4 h-4 text-purple-500" />
+                <span>Sandbox Fal.AI</span>
+              </motion.button>
+            </Link>
+
             <Link href="/login">
               <motion.button
                 whileHover={{ scale: 1.03 }}
@@ -147,9 +158,20 @@ export default function LandingPage() {
               </motion.button>
             </Link>
 
+            <Link href="/sandbox/fal-ai">
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                className="w-full sm:w-auto px-7 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full text-base font-semibold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+              >
+                <Sparkles className="w-5 h-5 text-purple-200" />
+                <span>Coba Sandbox Fal.AI</span>
+              </motion.button>
+            </Link>
+
             <a
               href="#cara-kerja"
-              className="w-full sm:w-auto px-7 py-4 bg-white text-dark border border-gray-200 hover:border-primary/40 rounded-full text-base font-medium shadow-sm hover:shadow transition-all flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-6 py-4 bg-white text-dark border border-gray-200 hover:border-primary/40 rounded-full text-base font-medium shadow-sm hover:shadow transition-all flex items-center justify-center gap-2"
             >
               Lihat Cara Kerja
             </a>

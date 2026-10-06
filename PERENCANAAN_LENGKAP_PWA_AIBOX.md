@@ -32,8 +32,9 @@ Sistem **Photobooth AI 100% Client-Side PWA** dengan:
 | **Payment** | Tripay QRIS | Biaya terendah 0.7% + Rp 100 net, KYC perorangan cepat, webhook SHA256 real-time |
 | **PWA** | `@serwist/next` | Service Worker modern, precaching optimal |
 | **Hosting** | Vercel Hobby | GRATIS, Edge CDN, HTTPS otomatis |
+| **AI Generative (Opsional)** | Fal.ai API (SDXL / Flux + InstantID) | Fitur Paket Premium: Transformasi Foto-to-Foto Ghibli (Latensi ~2.5s) |
 
-> ✅ **Rekomendasi Storage:** Google Drive adalah pilihan TERBAIK saat ini. Tidak ada biaya storage, tidak ada biaya bandwidth download, link permanen, dan bisa diakses publik. Jauh lebih murah dan efektif dibanding Firebase Storage / S3.
+> ✅ **Rekomendasi Storage & AI:** Google Drive adalah pilihan TERBAIK untuk storage. Untuk Fitur AI Ghibli, ikuti panduan riset lengkap pada [RISET_DAN_PERENCANAAN_FITUR_GHIBLI_AI.md](file:///d:/project_kecil/ai-box/pwa-aibox/RISET_DAN_PERENCANAAN_FITUR_GHIBLI_AI.md).
 
 ---
 
