@@ -20,8 +20,11 @@ export const metadata: Metadata = {
     "The world's premier AI-powered photobooth with gesture control — built for effortless, unforgettable moments.",
   manifest: "/manifest.json",
   icons: {
-    icon: "/icons/icon-192.svg",
-    apple: "/icons/icon-192.svg",
+    icon: [
+      { url: "/logo.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/logo.svg",
+    apple: "/logo.svg",
   },
   appleWebApp: {
     capable: true,
@@ -50,7 +53,9 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable}`}
     >
       <head>
-        <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
+        <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+        <link rel="shortcut icon" href="/logo.svg" />
+        <link rel="apple-touch-icon" href="/logo.svg" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta
           name="apple-mobile-web-app-status-bar-style"

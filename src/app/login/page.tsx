@@ -12,8 +12,10 @@ import {
   AlertCircle,
   ArrowLeft,
   ShieldCheck,
+  Camera,
+  RotateCcw,
 } from "lucide-react";
-import { validateAdmin, saveSession, isLoggedIn } from "@/lib/auth";
+import { validateAdmin, saveSession, isLoggedIn, getSession, clearSession } from "@/lib/auth";
 import Logo from "@/components/Logo";
 
 export default function LoginPage() {
@@ -27,6 +29,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     setMounted(true);
+    // If admin is already logged in, automatically go straight to booth (no session prompt!)
     if (isLoggedIn()) {
       router.replace("/booth");
     }
@@ -89,7 +92,7 @@ export default function LoginPage() {
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-            AI Box Kiosk Console
+            AI Box Kiosk Login
           </h1>
           <p className="text-[#9b9eaf] text-xs sm:text-sm mt-1.5 font-normal">
             Masuk untuk mengaktifkan sesi kamera & sensor interaktif
@@ -203,7 +206,7 @@ export default function LoginPage() {
             className="text-[#9b9eaf] hover:text-[#f0a25c] text-xs font-mono-tech transition-colors inline-flex items-center gap-1.5 group"
           >
             <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" />
-            <span>Kembali ke Halaman Publik</span>
+            <span>Kembali Halaman Publik</span>
           </a>
         </div>
       </motion.div>

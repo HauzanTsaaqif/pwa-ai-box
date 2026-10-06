@@ -3,6 +3,7 @@ export interface FrameSlot {
   y: number;
   width: number;
   height: number;
+  shape?: "circle" | "rect" | "rounded";
 }
 
 export interface FrameTemplate {
@@ -39,7 +40,7 @@ export interface FormatItem {
 export const FORMATS: FormatItem[] = [
   {
     id: "strip_2x6",
-    name: "Classic Strip (2x6 Inch)",
+    name: "Single Strip (2x6 Inch)",
     ratio: "2:6 Vertikal",
     dimensions: "600 × 1800 px (300 DPI)",
     description: "Format photobooth strip vertikal klasik terfavorit, pas untuk bookmark dan saku.",
@@ -48,7 +49,7 @@ export const FORMATS: FormatItem[] = [
   },
   {
     id: "double_4x6",
-    name: "Postcard / Double Strip (4x6 Inch)",
+    name: "Double Strip (4x6 Inch)",
     ratio: "4:6 Studio",
     dimensions: "1200 × 1800 px (300 DPI)",
     description: "Format kartu foto studio 4x6 inch, mendukung kolase pesta dan strip ganda siap potong.",
@@ -118,7 +119,7 @@ export const FRAMES: FrameTemplate[] = [
     accentHex: "#ec4899",
     borderHex: "#fbcfe8",
     slots: [
-      { x: 147, y: 207, width: 461, height: 460 },
+      { x: 147, y: 207, width: 461, height: 460, shape: "circle" },
       { x: 719, y: 703, width: 388, height: 520 },
       { x: 174, y: 1104, width: 345, height: 463 },
     ],
@@ -126,7 +127,7 @@ export const FRAMES: FrameTemplate[] = [
   {
     id: "kado_frame2",
     formatId: "double_4x6",
-    name: "Gift Party / Kado (4x6)",
+    name: "Gift Party",
     tagline: "BIRTHDAY GIFT // PARTY MOMENTS",
     frameSrc: "/frames/kado_frame2.png",
     width: 1200,

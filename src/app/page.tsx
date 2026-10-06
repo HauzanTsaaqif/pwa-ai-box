@@ -16,9 +16,11 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import Logo from "@/components/Logo";
+import { isLoggedIn } from "@/lib/auth";
 
 export default function LandingPage() {
   const [mounted, setMounted] = useState(false);
+  const [targetBoothUrl, setTargetBoothUrl] = useState("/login");
   const [cameraFlash, setCameraFlash] = useState(false);
   const [boxFlash, setBoxFlash] = useState(false);
   const [isFocusing, setIsFocusing] = useState(false);
@@ -28,6 +30,9 @@ export default function LandingPage() {
 
   useEffect(() => {
     setMounted(true);
+    if (isLoggedIn()) {
+      setTargetBoothUrl("/booth");
+    }
   }, []);
 
   const handleMouseEnterText = () => {
@@ -107,7 +112,18 @@ export default function LandingPage() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <Link href="/login">
+            <Link href="/sandbox/fal-ai">
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                className="px-4 py-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 border border-purple-500/20 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2"
+              >
+                <Sparkles className="w-4 h-4 text-purple-500" />
+                <span>Sandbox Fal.AI</span>
+              </motion.button>
+            </Link>
+
+            <Link href={targetBoothUrl}>
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -197,6 +213,7 @@ export default function LandingPage() {
               Elevated by aibox.
             </span>
           </h1>
+
         </motion.div>
 
         {/* Subtitle */}
@@ -217,7 +234,7 @@ export default function LandingPage() {
           transition={{ duration: 0.7, delay: 0.3 }}
           className="flex flex-col sm:flex-row items-center justify-center gap-3.5 mb-14 w-full sm:w-auto"
         >
-          <Link href="/login" className="w-full sm:w-auto">
+          <Link href={targetBoothUrl} className="w-full sm:w-auto">
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -226,6 +243,17 @@ export default function LandingPage() {
               <Camera className="w-4 h-4" />
               <span>Mulai AIBOX</span>
               <ArrowRight className="w-4 h-4" />
+            </motion.button>
+          </Link>
+
+          <Link href="/sandbox/fal-ai" className="w-full sm:w-auto">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="w-full sm:w-auto px-7 py-3.5 bg-gradient-to-r from-purple-600/20 to-indigo-600/20 hover:from-purple-600/40 hover:to-indigo-600/40 border border-purple-500/30 text-white rounded-xl text-sm font-semibold tracking-tight transition-all flex items-center justify-center gap-2.5"
+            >
+              <Sparkles className="w-4 h-4 text-purple-400" />
+              <span>Coba Sandbox Fal.AI</span>
             </motion.button>
           </Link>
 
