@@ -30,8 +30,8 @@ export class MediaPipeManager {
   private lastGesture: GestureType = "none";
   private gestureStableCount: number = 0;
   private onGestureCallback: ((gesture: GestureResult) => void) | null = null;
-  private targetFPS: number = 30;
-  private frameInterval: number = 1000 / 30;
+  private targetFPS: number = 60;
+  private frameInterval: number = 1000 / 60;
   private lastFrameTime: number = 0;
   private videoRef: HTMLVideoElement | null = null;
 
@@ -80,7 +80,7 @@ export class MediaPipeManager {
   }
 
   setTargetFPS(fps: number): void {
-    this.targetFPS = Math.max(2, Math.min(30, fps));
+    this.targetFPS = Math.max(2, Math.min(60, fps));
     this.frameInterval = 1000 / this.targetFPS;
   }
 
@@ -165,16 +165,11 @@ export class MediaPipeManager {
           this.gestureStableCount++;
         } else {
           this.lastGesture = gesture;
-          this.gestureStableCount = 0;
+          this.gestureStableCount = 1;
         }
 
-        if (
-          (gesture === "wave" ||
-            gesture === "thumbs_up" ||
-            gesture === "thumbs_down" ||
-            this.gestureStableCount >= 2) &&
-          this.onGestureCallback
-        ) {
+        // Always invoke callback with fresh landmarks every frame for ultra responsive, zero-delay skeleton drawing & cursor tracking
+        if (this.onGestureCallback) {
           this.onGestureCallback({
             gesture,
             landmarks,
@@ -212,34 +207,49 @@ export class MediaPipeManager {
 
     const fingersExtended = this.getFingersExtended(landmarks);
 
-    // THUMBS UP: Thumb pointing UP, all other 4 fingers folded
-    if (
-      landmarks[4].y < landmarks[3].y &&
-      landmarks[4].y < landmarks[5].y &&
-      !fingersExtended[1] &&
-      !fingersExtended[2] &&
-      !fingersExtended[3] &&
-      !fingersExtended[4]
-    )
-      return "thumbs_up";
+    // Check if 4 main fingers (index, middle, ring, pinky) are curled into a fist
+    const mainFingersCurled = [8, 12, 16, 20].every((tip, idx) => {
+      const mcp = [5, 9, 13, 17][idx];
+      const distTipToMcp = Math.hypot(
+        landmarks[tip].x - landmarks[mcp].x,
+        landmarks[tip].y - landmarks[mcp].y
+      );
+      return distTipToMcp < 0.14 || !fingersExtended[idx + 1];
+    });
 
-    // THUMBS DOWN: Thumb pointing DOWN, all other 4 fingers folded
+    const thumbExtendedFromMcp = Math.hypot(
+      landmarks[4].x - landmarks[2].x,
+      landmarks[4].y - landmarks[2].y
+    ) > 0.06;
+
+    // THUMBS DOWN (👎 Dislike / Retake): Thumb pointing DOWN, all other 4 fingers folded
     if (
+      mainFingersCurled &&
+      thumbExtendedFromMcp &&
       landmarks[4].y > landmarks[3].y &&
-      landmarks[4].y > landmarks[17].y &&
-      !fingersExtended[1] &&
-      !fingersExtended[2] &&
-      !fingersExtended[3] &&
-      !fingersExtended[4]
-    )
+      landmarks[4].y > landmarks[2].y &&
+      landmarks[4].y > Math.min(landmarks[0].y, landmarks[5].y)
+    ) {
       return "thumbs_down";
+    }
+
+    // THUMBS UP (👍 Like / Continue): Thumb pointing UP, all other 4 fingers folded
+    if (
+      mainFingersCurled &&
+      thumbExtendedFromMcp &&
+      landmarks[4].y < landmarks[3].y &&
+      landmarks[4].y < landmarks[2].y &&
+      landmarks[4].y < Math.max(landmarks[0].y, landmarks[5].y)
+    ) {
+      return "thumbs_up";
+    }
 
     // Static OPEN PALM
     const extendedCount = fingersExtended.filter(Boolean).length;
     if (extendedCount >= 4) return "open_palm";
 
-    // FIST: no fingers extended
-    if (fingersExtended.every((f) => !f)) return "fist";
+    // FIST: all fingers curled
+    if (mainFingersCurled && !thumbExtendedFromMcp) return "fist";
 
     // PEACE: index + middle extended only
     if (
@@ -267,17 +277,27 @@ export class MediaPipeManager {
   private getFingersExtended(landmarks: NormalizedLandmark[]): boolean[] {
     const tips = [4, 8, 12, 16, 20];
     const pipJoints = [3, 6, 10, 14, 18];
+    const mcpJoints = [2, 5, 9, 13, 17];
+    const wrist = landmarks[0];
 
     return tips.map((tip, i) => {
       if (i === 0) {
         const thumbTip = landmarks[tip];
         const indexMcp = landmarks[5];
-        const distance = Math.sqrt(
-          (thumbTip.x - indexMcp.x) ** 2 + (thumbTip.y - indexMcp.y) ** 2
+        const distance = Math.hypot(
+          thumbTip.x - indexMcp.x,
+          thumbTip.y - indexMcp.y
         );
-        return distance > 0.1;
+        return distance > 0.085;
       }
-      return landmarks[tip].y < landmarks[pipJoints[i]].y;
+
+      // Check both upright Y-coord and distance from wrist to support all angles
+      const isUpright = landmarks[tip].y < landmarks[pipJoints[i]].y;
+      const distTipToWrist = Math.hypot(landmarks[tip].x - wrist.x, landmarks[tip].y - wrist.y);
+      const distPipToWrist = Math.hypot(landmarks[pipJoints[i]].x - wrist.x, landmarks[pipJoints[i]].y - wrist.y);
+      const distTipToMcp = Math.hypot(landmarks[tip].x - landmarks[mcpJoints[i]].x, landmarks[tip].y - landmarks[mcpJoints[i]].y);
+
+      return isUpright || (distTipToWrist > distPipToWrist * 1.08 && distTipToMcp > 0.12);
     });
   }
 
@@ -316,7 +336,7 @@ export class MediaPipeManager {
       }
     }
 
-    if (totalDisplacement >= 0.045 && directionChanges >= 1) {
+    if (totalDisplacement >= 0.12 && directionChanges >= 3) {
       this.xHistory = [];
       this.lastWaveTime = now;
       return true;
@@ -367,9 +387,9 @@ export function drawHandSkeleton(
     };
   }
 
-  // --- PASS 1: AMBIENT NEON OUTER GLOW (Zero Gaussian Blur Overhead) ---
-  ctx.lineWidth = 5.5;
-  ctx.strokeStyle = "rgba(240, 162, 92, 0.28)";
+// --- PASS 1: CLEAN MINIMAL SKELETON CONNECTIONS (No heavy neon outer glow) ---
+  ctx.lineWidth = 1.8;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.beginPath();
@@ -381,54 +401,30 @@ export function drawHandSkeleton(
   }
   ctx.stroke();
 
-  // --- PASS 2: SOLID CORE BONES ---
-  ctx.lineWidth = 2.2;
-  ctx.strokeStyle = "rgba(255, 230, 205, 0.95)";
-  ctx.beginPath();
-  for (const [start, end] of connections) {
-    const p1 = coords[start];
-    const p2 = coords[end];
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-  }
-  ctx.stroke();
-
-  // --- PASS 3: JOINT NODES & ACTIVE POINTER ---
-  const tips = [4, 8, 12, 16, 20];
+  // --- PASS 2: SUBTLE JOINT NODES & CLEAN ACTIVE POINTER ---
   for (let idx = 0; idx < 21; idx++) {
     const p = coords[idx];
-    const isTip = tips.includes(idx);
 
     if (idx === 8) {
-      // Index finger tip (active cursor pointer): glowing halo ring + bright core
+      // Index finger tip (active cursor pointer): clean minimal dot with subtle accent ring
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 11, 0, 2 * Math.PI);
-      ctx.fillStyle = "rgba(240, 162, 92, 0.35)";
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 5.5, 0, 2 * Math.PI);
+      ctx.arc(p.x, p.y, 4.5, 0, 2 * Math.PI);
       ctx.fillStyle = "#ffffff";
       ctx.fill();
       ctx.lineWidth = 1.5;
       ctx.strokeStyle = "#f0a25c";
       ctx.stroke();
-    } else if (isTip) {
-      // Fingertips: apricot glow + solid node
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 7, 0, 2 * Math.PI);
-      ctx.fillStyle = "rgba(240, 162, 92, 0.3)";
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 4, 0, 2 * Math.PI);
-      ctx.fillStyle = "#f0a25c";
-      ctx.fill();
-    } else {
-      // Knuckles and joints
+    } else if (idx === 4 || idx === 12 || idx === 16 || idx === 20) {
+      // Other fingertips: small clean neutral node
       ctx.beginPath();
       ctx.arc(p.x, p.y, 2.8, 0, 2 * Math.PI);
-      ctx.fillStyle = "rgba(247, 247, 251, 0.85)";
+      ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+      ctx.fill();
+    } else {
+      // Knuckles and joints: subtle minimal node
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 2, 0, 2 * Math.PI);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
       ctx.fill();
     }
   }
